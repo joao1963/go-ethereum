@@ -145,6 +145,11 @@ type accountResponse struct {
 	hashes   []common.Hash         // Account hashes in the returned range
 	accounts []*types.StateAccount // Expanded accounts in the returned range
 
+	// origin requested, and, more importantly, the path for which the proof is valid.
+	origin common.Hash
+	root   common.Hash          // root for which this response is valid
+	proof  ethdb.KeyValueReader // proof for origin and last value.
+
 	cont bool // Whether the account range has a continuation
 }
 
@@ -222,6 +227,10 @@ type storageResponse struct {
 
 	hashes [][]common.Hash // Storage slot hashes in the returned range
 	slots  [][][]byte      // Storage slot values in the returned range
+
+	// origin requested, and, more importantly, the path for which the proof is valid.
+	origin common.Hash
+	proof  ethdb.KeyValueReader // proof for origin and last value.
 
 	cont bool // Whether the last storage range has a continuation
 }
@@ -2518,6 +2527,9 @@ func (s *Syncer) OnAccounts(peer SyncPeer, id uint64, hashes []common.Hash, acco
 		task:     req.task,
 		hashes:   hashes,
 		accounts: accs,
+		proof:    nodes.Set(),
+		origin:   req.origin,
+		root:     root,
 		cont:     cont,
 	}
 	select {
@@ -2735,6 +2747,8 @@ func (s *Syncer) OnStorage(peer SyncPeer, id uint64, hashes [][]common.Hash, slo
 		hashes = append(hashes, []common.Hash{})
 		slots = append(slots, [][]byte{})
 	}
+	var proofdb ethdb.KeyValueReader
+
 	for i := 0; i < len(hashes); i++ {
 		// Convert the keys and proofs into an internal format
 		keys := make([][]byte, len(hashes[i]))
@@ -2760,7 +2774,7 @@ func (s *Syncer) OnStorage(peer SyncPeer, id uint64, hashes [][]common.Hash, slo
 		} else {
 			// A proof was attached, the response is only partial, check that the
 			// returned data is indeed part of the storage trie
-			proofdb := nodes.Set()
+			proofdb = nodes.Set()
 
 			cont, err = trie.VerifyRangeProof(req.roots[i], req.origin[:], keys, slots[i], proofdb)
 			if err != nil {
@@ -2778,6 +2792,8 @@ func (s *Syncer) OnStorage(peer SyncPeer, id uint64, hashes [][]common.Hash, slo
 		roots:    req.roots,
 		hashes:   hashes,
 		slots:    slots,
+		origin:   req.origin,
+		proof:    proofdb,
 		cont:     cont,
 	}
 	select {
