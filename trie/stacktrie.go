@@ -511,3 +511,159 @@ func (st *StackTrie) Commit() (common.Hash, error) {
 	}
 	return common.BytesToHash(st.val), nil
 }
+
+func (st *StackTrie) insertHash(key, value []byte) {
+	switch st.nodeType {
+	case branchNode: /* Branch */
+		idx := int(key[st.keyOffset])
+		// Add new child
+		if st.children[idx] == nil {
+			st.children[idx] = stackTrieFromPool(st.db)
+			st.children[idx].keyOffset = st.keyOffset + 1
+		}
+		st.children[idx].insertHash(key, value)
+	case extNode: /* Ext */
+		// Compare both key chunks and see where they differ
+		diffidx := st.getDiffIndex(key)
+
+		// Check if chunks are identical. If so, recurse into
+		// the child node. Otherwise, the key has to be split
+		// into 1) an optional common prefix, 2) the fullnode
+		// representing the two differing path, and 3) a leaf
+		// for each of the differentiated subtrees.
+		if diffidx == len(st.key) {
+			// Ext key and key segment are identical, recurse into
+			// the child node.
+			st.children[0].insert(key, value)
+			return
+		}
+		// Save the original part. Depending if the break is
+		// at the extension's last byte or not, create an
+		// intermediate extension or use the extension's child
+		// node directly.
+		var n *StackTrie
+		if diffidx < len(st.key)-1 {
+			n = newExt(diffidx+1, st.key, st.children[0], st.db)
+		} else {
+			// Break on the last byte, no need to insert
+			// an extension node: reuse the current node
+			n = st.children[0]
+		}
+		// Convert to hash
+		n.hash()
+		var p *StackTrie
+		if diffidx == 0 {
+			// the break is on the first byte, so
+			// the current node is converted into
+			// a branch node.
+			st.children[0] = nil
+			p = st
+			st.nodeType = branchNode
+		} else {
+			// the common prefix is at least one byte
+			// long, insert a new intermediate branch
+			// node.
+			st.children[0] = stackTrieFromPool(st.db)
+			st.children[0].nodeType = branchNode
+			st.children[0].keyOffset = st.keyOffset + diffidx
+			p = st.children[0]
+		}
+		// Create a leaf for the inserted part
+		o := newLeaf(st.keyOffset+diffidx+1, key, value, st.db)
+
+		// Insert both child leaves where they belong:
+		origIdx := st.key[diffidx]
+		newIdx := key[diffidx+st.keyOffset]
+		p.children[origIdx] = n
+		p.children[newIdx] = o
+		st.key = st.key[:diffidx]
+
+	case leafNode: /* Leaf */
+		// Compare both key chunks and see where they differ
+		diffidx := st.getDiffIndex(key)
+
+		// Overwriting a key isn't supported, which means that
+		// the current leaf is expected to be split into 1) an
+		// optional extension for the common prefix of these 2
+		// keys, 2) a fullnode selecting the path on which the
+		// keys differ, and 3) one leaf for the differentiated
+		// component of each key.
+		if diffidx >= len(st.key) {
+			panic("Trying to insert into existing key")
+		}
+
+		// Check if the split occurs at the first nibble of the
+		// chunk. In that case, no prefix extnode is necessary.
+		// Otherwise, create that
+		var p *StackTrie
+		if diffidx == 0 {
+			// Convert current leaf into a branch
+			st.nodeType = branchNode
+			p = st
+			st.children[0] = nil
+		} else {
+			// Convert current node into an ext,
+			// and insert a child branch node.
+			st.nodeType = extNode
+			st.children[0] = NewStackTrie(st.db)
+			st.children[0].nodeType = branchNode
+			st.children[0].keyOffset = st.keyOffset + diffidx
+			p = st.children[0]
+		}
+
+		// Create the two child leaves: the one containing the
+		// original value and the one containing the new value
+		// The child leave will be hashed directly in order to
+		// free up some memory.
+		origIdx := st.key[diffidx]
+		p.children[origIdx] = newLeaf(diffidx+1, st.key, st.val, st.db)
+		p.children[origIdx].hash()
+
+		newIdx := key[diffidx+st.keyOffset]
+		newElem := newLeaf(p.keyOffset+1, key, value, st.db)
+		//newElem.nodeType = hashedNode
+		p.children[newIdx] = newElem
+
+		// Finally, cut off the key part that has been passed
+		// over to the children.
+		st.key = st.key[:diffidx]
+		st.val = nil
+	case emptyNode: /* Empty */
+		st.nodeType = hashedNode
+		st.key = key[st.keyOffset:]
+		st.val = value
+	case hashedNode:
+		panic("trying to insert into hash")
+	default:
+		panic("invalid type")
+	}
+}
+
+func (st *StackTrie) dumpTrie(lvl int) {
+	var indent []byte
+	for i := 0; i < lvl; i++ {
+		indent = append(indent, ' ')
+	}
+	switch st.nodeType {
+	case branchNode:
+		fmt.Printf("\n%s FN (ko=%d)", string(indent), st.keyOffset)
+
+		for i := 0; i < 16; i++ {
+			if st.children[i] == nil {
+				continue
+			}
+			fmt.Printf("\n%s %#x. ", string(indent), i)
+			st.children[i].dumpTrie(lvl + 1)
+		}
+		fmt.Println("")
+	case extNode:
+		fmt.Printf("%s: sn(%#x, ko=%d)", string(indent), st.key, st.keyOffset)
+		st.children[0].dumpTrie(lvl + 1)
+	case leafNode:
+		fmt.Printf("%s: leaf(%#x): %x (ko=%d)", string(indent), st.key, st.val, st.keyOffset)
+	case hashedNode:
+		fmt.Printf("hash: %#x", st.val)
+	default:
+		fmt.Printf("Foo: %d ? ", st.nodeType)
+	}
+}

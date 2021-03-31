@@ -18,6 +18,7 @@ package trie
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -47,7 +48,7 @@ func NewNodeSet() *NodeSet {
 func (db *NodeSet) Put(key []byte, value []byte) error {
 	db.lock.Lock()
 	defer db.lock.Unlock()
-
+	fmt.Printf("NodeSet Put(%x, %x)\n", key, value)
 	if _, ok := db.nodes[string(key)]; ok {
 		return nil
 	}
