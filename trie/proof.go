@@ -67,7 +67,6 @@ func (t *Trie) Prove(key []byte, fromLevel uint, proofDb ethdb.KeyValueWriter) e
 	}
 	hasher := newHasher(false)
 	defer returnHasherToPool(hasher)
-
 	for i, n := range nodes {
 		if fromLevel > 0 {
 			fromLevel--
