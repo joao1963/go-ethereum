@@ -17,6 +17,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"os/signal"
@@ -536,9 +537,9 @@ func freezerInspect(ctx *cli.Context) error {
 }
 
 // importFuncs defines all supported chain data import functions.
-var importFuncs = map[string]func(db ethdb.Database, fn string, interrupt chan struct{}) error{
-	"preimage": utils.ImportPreimages,
-	"snapshot": utils.ImportSnapshot,
+var importFuncs = map[string]func(key []byte) bool{
+	"preimage": preimageChecker,
+	"snapshot": snapshotChecker,
 }
 
 func importChaindata(ctx *cli.Context) error {
@@ -578,33 +579,28 @@ func importChaindata(ctx *cli.Context) error {
 		}
 	}()
 	db := utils.MakeChainDatabase(ctx, stack, false)
-	return fn(db, ctx.Args().Get(1), interrupt)
+	return utils.ImportChainData(db, ctx.Args().Get(1), kind, fn, interrupt)
 }
 
 // exporter defines all the necessary information for chain data export.
 type exporter struct {
-	encoder  func(key []byte, val []byte) []byte
+	// checker returns the indicator that whether the given data is the
+	// requested chain data.
+	checker func(key []byte) bool
+
+	// prefixes specifies the key prefixes needed to obtain the specified
+	// chain data for database iteration.
 	prefixes [][]byte
 }
 
 // chainExporters defines the export scheme for all exportable chain data.
 var chainExporters = map[string]*exporter{
 	"preimage": {
-		encoder: func(key []byte, val []byte) []byte {
-			return val // The key can be derived by keccak56(val).
-		},
+		checker:  preimageChecker,
 		prefixes: [][]byte{rawdb.PreimagePrefix},
 	},
 	"snapshot": {
-		encoder: func(key []byte, val []byte) []byte {
-			// The prefix used to identify the snapshot data type,
-			// 0: account snapshot
-			// 1: storage snapshot
-			if len(key) == len(rawdb.SnapshotAccountPrefix)+common.HashLength {
-				return append([]byte{0}, append(key, val...)...)
-			}
-			return append([]byte{1}, append(key, val...)...)
-		},
+		checker:  snapshotChecker,
 		prefixes: [][]byte{rawdb.SnapshotAccountPrefix, rawdb.SnapshotStoragePrefix},
 	},
 }
@@ -646,5 +642,23 @@ func exportChaindata(ctx *cli.Context) error {
 		}
 	}()
 	db := utils.MakeChainDatabase(ctx, stack, true)
-	return utils.ExportChaindata(db, ctx.Args().Get(1), kind, exporter.encoder, exporter.prefixes, interrupt)
+	return utils.ExportChaindata(db, ctx.Args().Get(1), kind, exporter.checker, exporter.prefixes, interrupt)
+}
+
+// preimageChecker returns the indicator whether the chain data pointed by
+// the given key is preimage.
+func preimageChecker(key []byte) bool {
+	return bytes.HasPrefix(key, rawdb.PreimagePrefix) && len(key) == (len(rawdb.PreimagePrefix)+common.HashLength)
+}
+
+// snapshotChecker returns the indicator whether the chain data pointed by
+// the given key is snapshot(account snapshot or storage snapshot).
+func snapshotChecker(key []byte) bool {
+	if bytes.HasPrefix(key, rawdb.SnapshotAccountPrefix) && len(key) == (len(rawdb.SnapshotAccountPrefix)+common.HashLength) {
+		return true
+	}
+	if bytes.HasPrefix(key, rawdb.SnapshotStoragePrefix) && len(key) == (len(rawdb.SnapshotStoragePrefix)+2*common.HashLength) {
+		return true
+	}
+	return false
 }
