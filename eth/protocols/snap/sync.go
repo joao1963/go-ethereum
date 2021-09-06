@@ -2251,7 +2251,6 @@ func (s *Syncer) OnAccounts(peer SyncPeer, id uint64, hashes []common.Hash, acco
 	}
 	root := s.root
 	s.lock.Unlock()
-
 	// Reconstruct a partial trie from the response and verify it
 	keys := make([][]byte, len(hashes))
 	for i, key := range hashes {

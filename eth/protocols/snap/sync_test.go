@@ -22,6 +22,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math/big"
+	"os"
 	"sort"
 	"sync"
 	"testing"
@@ -154,8 +155,10 @@ func newTestPeer(id string, t *testing.T, term func()) *testPeer {
 		codeRequestHandler:    defaultCodeRequestHandler,
 		term:                  term,
 	}
-	//stderrHandler := log.StreamHandler(os.Stderr, log.TerminalFormat(true))
-	//peer.logger.SetHandler(stderrHandler)
+	if true{
+		stderrHandler := log.StreamHandler(os.Stderr, log.TerminalFormat(true))
+		peer.logger.SetHandler(stderrHandler)
+	}
 	return peer
 }
 
@@ -1711,4 +1714,57 @@ func TestSlotEstimation(t *testing.T) {
 			t.Errorf("test %d: have %d want %d", i, have, want)
 		}
 	}
+}
+
+// TestBesuSync tests a basic sync with one peer, with a particular alloc
+func TestBesuSync(t *testing.T) {
+	t.Parallel()
+
+	var (
+		once   sync.Once
+		cancel = make(chan struct{})
+		term   = func() {
+			once.Do(func() {
+				close(cancel)
+			})
+		}
+	)
+	sourceAccountTrie, elems := makeBesuAccountTrieNoStorage(100)
+
+	mkSource := func(name string) *testPeer {
+		source := newTestPeer(name, t, term)
+		source.accountTrie = sourceAccountTrie
+		source.accountValues = elems
+		return source
+	}
+	syncer := setupSyncer(mkSource("source"))
+	if err := syncer.Sync(sourceAccountTrie.Hash(), cancel); err != nil {
+		t.Fatalf("sync failed: %v", err)
+	}
+	verifyTrie(syncer.db, sourceAccountTrie.Hash(), t)
+}
+
+func makeBesuAccountTrieNoStorage(n int) (*trie.Trie, entrySlice) {
+	db := trie.NewDatabase(rawdb.NewMemoryDatabase())
+	accTrie, _ := trie.New(common.Hash{}, db)
+	var entries entrySlice
+	balance, _ := big.NewInt(0).SetString("90000000000000000000000", 10)
+	addrs := []string{"fe3b557e8fb62b89f4916b721be55ceb828dbd73",
+		"627306090abaB3A6e1400e9345bC60c78a8BEf57",
+		"f17f52151EbEF6C7334FAD080c5704D77216b732",
+		"b8c3bfFb71F76BeE2B2f81bdBC53Ad4C43e3f58E",
+		"E196880719eBF05646D89C498f97d2722DE66799"}
+	for _, addr := range addrs {
+		val, _ := rlp.EncodeToBytes(state.Account{Balance: balance, Root: emptyRoot, CodeHash: emptyCode[:]})
+		elem := kv{
+			v: common.CopyBytes(val),
+			k: crypto.Keccak256(common.FromHex(addr)),
+		}
+		accTrie.Update(elem.k, elem.v)
+		entries = append(entries, &elem)
+	}
+	sort.Sort(entries)
+	root, _, _ := accTrie.Commit(nil)
+	fmt.Printf("root: %x\n", root)
+	return accTrie, entries
 }
