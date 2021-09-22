@@ -722,8 +722,6 @@ func (db *Database) Commit(node common.Hash, report bool, callback func(common.H
 		}
 		batch.Reset()
 	}
-	db.lock.Lock()
-	defer db.lock.Unlock()
 
 	// Move the trie itself into the batch, flushing if enough data is accumulated
 	nodes, storage := len(db.dirties), db.dirtiesSize
@@ -739,6 +737,8 @@ func (db *Database) Commit(node common.Hash, report bool, callback func(common.H
 		return err
 	}
 	// Uncache any leftovers in the last batch
+	db.lock.Lock()
+	defer db.lock.Unlock()
 
 	batch.Replay(uncacher)
 	batch.Reset()

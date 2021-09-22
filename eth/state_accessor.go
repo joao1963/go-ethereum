@@ -120,7 +120,7 @@ func (eth *Ethereum) stateAtBlock(block *types.Block, reexec uint64, base *state
 		root, err := statedb.Commit(eth.blockchain.Config().IsEIP158(current.Number()))
 		if err != nil {
 			return nil, fmt.Errorf("stateAtBlock Commit failed, number %d root %v: %w",
-				current.NumberU64(),current.Root().Hex(), err)
+				current.NumberU64(), current.Root().Hex(), err)
 			//return nil, err
 		}
 		statedb, err = state.New(root, database, nil)
@@ -136,6 +136,9 @@ func (eth *Ethereum) stateAtBlock(block *types.Block, reexec uint64, base *state
 	if report {
 		nodes, imgs := database.TrieDB().Size()
 		log.Info("Historical state regenerated", "block", current.NumberU64(), "elapsed", time.Since(start), "nodes", nodes, "preimages", imgs)
+	}
+	if parent != block.Root() {
+		log.Warn("Recalculated state, wound up with the wrong root", "number", block.NumberU64(), "want", block.Root(), "have", parent)
 	}
 	return statedb, nil
 }
