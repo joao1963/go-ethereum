@@ -69,6 +69,7 @@ var (
 type Database struct {
 	diskdb ethdb.KeyValueStore // Persistent storage for matured trie nodes
 
+	logs    [300]string
 	cleans  *fastcache.Cache            // GC friendly memory cache of clean node RLPs
 	dirties map[common.Hash]*cachedNode // Data and references relationships of dirty trie nodes
 	oldest  common.Hash                 // Oldest tracked node, flush-list head
@@ -484,7 +485,7 @@ func (db *Database) Nodes() []common.Hash {
 func (db *Database) Reference(child common.Hash, parent common.Hash) {
 	db.lock.Lock()
 	defer db.lock.Unlock()
-	log.Info("Reference", "hash", child)
+	db.refLog(fmt.Sprintf("  ref hash %v", child.Hex()))
 	db.reference(child, parent)
 }
 
@@ -509,6 +510,14 @@ func (db *Database) reference(child common.Hash, parent common.Hash) {
 	}
 }
 
+func (db *Database) refLog(log string) {
+	copy(db.logs[:], db.logs[1:])
+	db.logs[len(db.logs)-1] = log
+}
+func (db *Database) Logs() []string {
+	return db.logs[:]
+}
+
 // Dereference removes an existing reference from a root node.
 func (db *Database) Dereference(root common.Hash) {
 	// Sanity check to ensure that the meta-root is not removed
@@ -518,7 +527,7 @@ func (db *Database) Dereference(root common.Hash) {
 	}
 	db.lock.Lock()
 	defer db.lock.Unlock()
-	log.Info("Dereference", "hash", root)
+	db.refLog(fmt.Sprintf("deref hash %v", root.Hex()))
 
 	nodes, storage, start := len(db.dirties), db.dirtiesSize, time.Now()
 	db.dereference(root, common.Hash{})

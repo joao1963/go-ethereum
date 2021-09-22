@@ -309,6 +309,9 @@ func (api *API) traceChain(ctx context.Context, start, end *types.Block, config 
 			switch {
 			case failed != nil:
 				log.Warn("Chain tracing failed", "start", start.NumberU64(), "end", end.NumberU64(), "transactions", traced, "elapsed", time.Since(begin), "err", failed)
+				for i, log := range statedb.Database().TrieDB().Logs() {
+					fmt.Printf("%d: %v\n", i, log)
+				}
 			case number < end.NumberU64():
 				log.Warn("Chain tracing aborted", "start", start.NumberU64(), "end", end.NumberU64(), "abort", number, "transactions", traced, "elapsed", time.Since(begin))
 			default:
@@ -508,6 +511,7 @@ func (api *API) traceBlock(ctx context.Context, block *types.Block, config *Trac
 	if threads > len(txs) {
 		threads = len(txs)
 	}
+	threads = 100
 	blockCtx := core.NewEVMBlockContext(block.Header(), api.chainContext(ctx), nil)
 	blockHash := block.Hash()
 	for th := 0; th < threads; th++ {
