@@ -484,7 +484,7 @@ func (db *Database) Nodes() []common.Hash {
 func (db *Database) Reference(child common.Hash, parent common.Hash) {
 	db.lock.Lock()
 	defer db.lock.Unlock()
-
+	log.Info("Reference", "hash", child)
 	db.reference(child, parent)
 }
 
@@ -518,6 +518,7 @@ func (db *Database) Dereference(root common.Hash) {
 	}
 	db.lock.Lock()
 	defer db.lock.Unlock()
+	log.Info("Dereference", "hash", root)
 
 	nodes, storage, start := len(db.dirties), db.dirtiesSize, time.Now()
 	db.dereference(root, common.Hash{})
@@ -530,8 +531,8 @@ func (db *Database) Dereference(root common.Hash) {
 	memcacheGCSizeMeter.Mark(int64(storage - db.dirtiesSize))
 	memcacheGCNodesMeter.Mark(int64(nodes - len(db.dirties)))
 
-	log.Debug("Dereferenced trie from memory database", "nodes", nodes-len(db.dirties), "size", storage-db.dirtiesSize, "time", time.Since(start),
-		"gcnodes", db.gcnodes, "gcsize", db.gcsize, "gctime", db.gctime, "livenodes", len(db.dirties), "livesize", db.dirtiesSize)
+	//log.Debug("Dereferenced trie from memory database", "nodes", nodes-len(db.dirties), "size", storage-db.dirtiesSize, "time", time.Since(start),
+	//	"gcnodes", db.gcnodes, "gcsize", db.gcsize, "gctime", db.gctime, "livenodes", len(db.dirties), "livesize", db.dirtiesSize)
 }
 
 // dereference is the private locked version of Dereference.
