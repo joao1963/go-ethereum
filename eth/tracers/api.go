@@ -23,6 +23,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"os"
 	"runtime"
 	"sync"
@@ -281,7 +282,7 @@ func (api *API) traceChain(ctx context.Context, start, end *types.Block, config 
 					//task.statedb.Finalise(api.backend.ChainConfig().IsEIP158(task.block.Number()))
 					//task.results[i] = &txTraceResult{Result: res}
 				//}
-				time.Sleep(time.Duration(500 * time.Millisecond))
+				time.Sleep(time.Duration(rand.Intn(500)) * time.Millisecond)
 				// Stream the result back to the user or abort on teardown
 				select {
 				case results <- task:
