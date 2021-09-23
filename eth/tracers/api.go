@@ -266,23 +266,24 @@ func (api *API) traceChain(ctx context.Context, start, end *types.Block, config 
 				//blockCtx := core.NewEVMBlockContext(task.block.Header(), api.chainContext(localctx), nil)
 				// Trace all the transactions contained within
 				//for i, tx := range task.block.Transactions() {
-					//msg, _ := tx.AsMessage(signer, task.block.BaseFee())
-					//txctx := &Context{
-					//	BlockHash: task.block.Hash(),
-					//	TxIndex:   i,
-					//	TxHash:    tx.Hash(),
-					//}
-					//res, err := api.traceTx(localctx, msg, txctx, blockCtx, task.statedb, config)
-					//if err != nil {
-					//	task.results[i] = &txTraceResult{Error: err.Error()}
-					//	log.Warn("Tracing failed", "hash", tx.Hash(), "block", task.block.NumberU64(), "err", err)
-					//	break
-					//}
-					//// Only delete empty objects if EIP158/161 (a.k.a Spurious Dragon) is in effect
-					//task.statedb.Finalise(api.backend.ChainConfig().IsEIP158(task.block.Number()))
-					//task.results[i] = &txTraceResult{Result: res}
+				//msg, _ := tx.AsMessage(signer, task.block.BaseFee())
+				//txctx := &Context{
+				//	BlockHash: task.block.Hash(),
+				//	TxIndex:   i,
+				//	TxHash:    tx.Hash(),
+				//}
+				//res, err := api.traceTx(localctx, msg, txctx, blockCtx, task.statedb, config)
+				//if err != nil {
+				//	task.results[i] = &txTraceResult{Error: err.Error()}
+				//	log.Warn("Tracing failed", "hash", tx.Hash(), "block", task.block.NumberU64(), "err", err)
+				//	break
+				//}
+				//// Only delete empty objects if EIP158/161 (a.k.a Spurious Dragon) is in effect
+				//task.statedb.Finalise(api.backend.ChainConfig().IsEIP158(task.block.Number()))
+				//task.results[i] = &txTraceResult{Result: res}
 				//}
 				time.Sleep(time.Duration(rand.Intn(500)) * time.Millisecond)
+				task.statedb.Finalise(api.backend.ChainConfig().IsEIP158(task.block.Number()))
 				// Stream the result back to the user or abort on teardown
 				select {
 				case results <- task:
@@ -294,6 +295,8 @@ func (api *API) traceChain(ctx context.Context, start, end *types.Block, config 
 	}
 	// Start a goroutine to feed all the blocks into the tracers
 	begin := time.Now()
+	var unrefs []common.Hash
+	var unrefMu sync.Mutex
 
 	go func() {
 		var (
@@ -312,9 +315,11 @@ func (api *API) traceChain(ctx context.Context, start, end *types.Block, config 
 			switch {
 			case failed != nil:
 				log.Warn("Chain tracing failed", "start", start.NumberU64(), "end", end.NumberU64(), "transactions", traced, "elapsed", time.Since(begin), "err", failed)
-				if statedb.Database().TrieDB() != nil {
-					for i, log := range statedb.Database().TrieDB().Logs() {
-						fmt.Printf("%d: %v\n", i, log)
+				if statedb != nil {
+					if statedb.Database().TrieDB() != nil {
+						for i, log := range statedb.Database().TrieDB().Logs() {
+							fmt.Printf("%d: %v\n", i, log)
+						}
 					}
 				}
 			case number < end.NumberU64():
@@ -332,6 +337,14 @@ func (api *API) traceChain(ctx context.Context, start, end *types.Block, config 
 				return
 			default:
 			}
+			// clean out any derefs
+			unrefMu.Lock()
+			for _, h := range unrefs {
+				statedb.Database().TrieDB().Dereference(h)
+			}
+			unrefs = unrefs[:0]
+			unrefMu.Unlock()
+
 			// Print progress logs if long enough time elapsed
 			if time.Since(logged) > 8*time.Second {
 				logged = time.Now()
@@ -377,7 +390,6 @@ func (api *API) traceChain(ctx context.Context, start, end *types.Block, config 
 			traced += uint64(len(txs))
 		}
 	}()
-
 	// Keep reading the trace results and stream the to the user
 	go func() {
 		var (
@@ -392,11 +404,13 @@ func (api *API) traceChain(ctx context.Context, start, end *types.Block, config 
 				Traces: res.results,
 			}
 			done[uint64(result.Block)] = result
-
+			unrefMu.Lock()
+			unrefs = append(unrefs, res.rootref)
+			unrefMu.Unlock()
 			// Dereference any parent tries held in memory by this task
-			if res.statedb.Database().TrieDB() != nil {
-				res.statedb.Database().TrieDB().Dereference(res.rootref)
-			}
+			//if res.statedb.Database().TrieDB() != nil {
+			//	res.statedb.Database().TrieDB().Dereference(res.rootref)
+			//}
 			// Stream completed traces to the user, aborting on the first error
 			for result, ok := done[next]; ok; result, ok = done[next] {
 				if len(result.Traces) > 0 || next == end.NumberU64() {
