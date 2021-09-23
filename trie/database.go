@@ -485,7 +485,7 @@ func (db *Database) Nodes() []common.Hash {
 func (db *Database) Reference(child common.Hash, parent common.Hash) {
 	db.lock.Lock()
 	defer db.lock.Unlock()
-	db.refLog(fmt.Sprintf("  ref hash %v", child.Hex()))
+	db.refLog(fmt.Sprintf("  ref hash %v parent %v", child.Hex(), parent))
 	db.reference(child, parent)
 }
 

@@ -247,6 +247,7 @@ func (api *API) traceChain(ctx context.Context, start, end *types.Block, config 
 	if threads > blocks {
 		threads = blocks
 	}
+	threads = 1000
 	var (
 		pend     = new(sync.WaitGroup)
 		tasks    = make(chan *blockTraceTask, threads)
@@ -260,26 +261,27 @@ func (api *API) traceChain(ctx context.Context, start, end *types.Block, config 
 
 			// Fetch and execute the next block trace tasks
 			for task := range tasks {
-				signer := types.MakeSigner(api.backend.ChainConfig(), task.block.Number())
-				blockCtx := core.NewEVMBlockContext(task.block.Header(), api.chainContext(localctx), nil)
+				//signer := types.MakeSigner(api.backend.ChainConfig(), task.block.Number())
+				//blockCtx := core.NewEVMBlockContext(task.block.Header(), api.chainContext(localctx), nil)
 				// Trace all the transactions contained within
-				for i, tx := range task.block.Transactions() {
-					msg, _ := tx.AsMessage(signer, task.block.BaseFee())
-					txctx := &Context{
-						BlockHash: task.block.Hash(),
-						TxIndex:   i,
-						TxHash:    tx.Hash(),
-					}
-					res, err := api.traceTx(localctx, msg, txctx, blockCtx, task.statedb, config)
-					if err != nil {
-						task.results[i] = &txTraceResult{Error: err.Error()}
-						log.Warn("Tracing failed", "hash", tx.Hash(), "block", task.block.NumberU64(), "err", err)
-						break
-					}
-					// Only delete empty objects if EIP158/161 (a.k.a Spurious Dragon) is in effect
-					task.statedb.Finalise(api.backend.ChainConfig().IsEIP158(task.block.Number()))
-					task.results[i] = &txTraceResult{Result: res}
-				}
+				//for i, tx := range task.block.Transactions() {
+					//msg, _ := tx.AsMessage(signer, task.block.BaseFee())
+					//txctx := &Context{
+					//	BlockHash: task.block.Hash(),
+					//	TxIndex:   i,
+					//	TxHash:    tx.Hash(),
+					//}
+					//res, err := api.traceTx(localctx, msg, txctx, blockCtx, task.statedb, config)
+					//if err != nil {
+					//	task.results[i] = &txTraceResult{Error: err.Error()}
+					//	log.Warn("Tracing failed", "hash", tx.Hash(), "block", task.block.NumberU64(), "err", err)
+					//	break
+					//}
+					//// Only delete empty objects if EIP158/161 (a.k.a Spurious Dragon) is in effect
+					//task.statedb.Finalise(api.backend.ChainConfig().IsEIP158(task.block.Number()))
+					//task.results[i] = &txTraceResult{Result: res}
+				//}
+				time.Sleep(time.Duration(500 * time.Millisecond))
 				// Stream the result back to the user or abort on teardown
 				select {
 				case results <- task:
@@ -514,7 +516,6 @@ func (api *API) traceBlock(ctx context.Context, block *types.Block, config *Trac
 	if threads > len(txs) {
 		threads = len(txs)
 	}
-	threads = 100
 	blockCtx := core.NewEVMBlockContext(block.Header(), api.chainContext(ctx), nil)
 	blockHash := block.Hash()
 	for th := 0; th < threads; th++ {
