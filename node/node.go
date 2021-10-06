@@ -54,6 +54,7 @@ type Node struct {
 	lifecycles    []Lifecycle // All registered backends, services, and auxiliary services that have a lifecycle
 	rpcAPIs       []rpc.API   // List of APIs currently provided by the node
 	http          *httpServer //
+	engineHttp    *httpServer // http server for the engine API
 	ws            *httpServer //
 	ipc           *ipcServer  // Stores information about the ipc http server
 	inprocHandler *rpc.Server // In-process RPC request handler to process the API requests
@@ -147,6 +148,7 @@ func New(conf *Config) (*Node, error) {
 
 	// Configure RPC servers.
 	node.http = newHTTPServer(node.log, conf.HTTPTimeouts)
+	node.engineHttp = newHTTPServer(node.log, conf.HTTPTimeouts)
 	node.ws = newHTTPServer(node.log, rpc.DefaultHTTPTimeouts)
 	node.ipc = newIPCServer(node.log, conf.IPCEndpoint())
 
@@ -352,6 +354,16 @@ func (n *Node) startRPC() error {
 
 	// Configure HTTP.
 	if n.config.HTTPHost != "" {
+		var regularApi []rpc.API
+		var engineApi []rpc.API
+		for _, api := range n.rpcAPIs {
+			if api.Namespace == "engine" {
+				engineApi = append(engineApi, api)
+			} else {
+				regularApi = append(regularApi, api)
+			}
+		}
+
 		config := httpConfig{
 			CorsAllowedOrigins: n.config.HTTPCors,
 			Vhosts:             n.config.HTTPVirtualHosts,
@@ -361,7 +373,13 @@ func (n *Node) startRPC() error {
 		if err := n.http.setListenAddr(n.config.HTTPHost, n.config.HTTPPort); err != nil {
 			return err
 		}
-		if err := n.http.enableRPC(n.rpcAPIs, config); err != nil {
+		if err := n.http.enableRPC(regularApi, config); err != nil {
+			return err
+		}
+		if err := n.engineHttp.setListenAddr(n.config.HTTPHost, n.config.HTTPPort+1); err != nil {
+			return err
+		}
+		if err := n.engineHttp.enableRPC(engineApi, config); err != nil {
 			return err
 		}
 	}
@@ -385,6 +403,10 @@ func (n *Node) startRPC() error {
 	if err := n.http.start(); err != nil {
 		return err
 	}
+	if err := n.engineHttp.start(); err != nil {
+		return err
+	}
+
 	return n.ws.start()
 }
 
