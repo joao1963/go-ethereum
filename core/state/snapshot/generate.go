@@ -57,6 +57,11 @@ var (
 	// the the value is too small, the efficiency of the state recovery will decrease.
 	storageCheckRange = 1024
 
+	// thrashingTimeout is time threshold below which a generator abort is considered
+	// database thrashing and will temporarilly disable generation. Generation will
+	// resume the moment a run allowance takes longer than this limit.
+	thrashingTimeout = 450 * time.Millisecond
+
 	// errMissingTrie is returned if the target trie is missing while the generation
 	// is running. In this case the generation is aborted and wait the new signal.
 	errMissingTrie = errors.New("missing trie")
@@ -101,6 +106,7 @@ type generatorStats struct {
 	accounts uint64             // Number of accounts indexed(generated or recovered)
 	slots    uint64             // Number of storage slots indexed(generated or recovered)
 	storage  common.StorageSize // Total account and storage slot size(generation or recovery)
+	thrashed bool               // Flag whether the generator was previously insta-stopped
 }
 
 // Log creates an contextual log with the given message and the context pulled
@@ -548,10 +554,26 @@ func (dl *diskLayer) generate(stats *generatorStats) {
 	}
 	var (
 		batch     = dl.diskdb.NewBatch()
+		resumed   = time.Now()
 		logged    = time.Now()
 		accOrigin = common.CopyBytes(accMarker)
 		abort     chan *generatorStats
 	)
+	// If the generator was thrashing previously, refuse starting up until the
+	// block stream gets a chance to subside. Since we can't time that, simply
+	// wait until the thrashing condition is no longer met.
+	if stats.thrashed {
+		stats.Log("Generator thrashed, waiting...", dl.root, dl.genMarker)
+
+		// Wait until we're interrupted. This will either occur instantly if a
+		// batch of blocks is imported, or within the network block time.
+		abort = <-dl.genAbort
+
+		// Update the thrasing state and abort, potentially really resuming next
+		stats.thrashed = time.Since(resumed) < thrashingTimeout
+		abort <- stats
+		return
+	}
 	stats.Log("Resuming state snapshot generation", dl.root, dl.genMarker)
 
 	checkAndFlush := func(currentLocation []byte) error {
@@ -702,7 +724,6 @@ func (dl *diskLayer) generate(stats *generatorStats) {
 		accMarker = nil
 		return nil
 	}
-
 	// Global loop for regerating the entire state trie + all layered storage tries.
 	for {
 		exhausted, last, err := dl.generateRange(dl.root, rawdb.SnapshotAccountPrefix, "account", accOrigin, accountRange, stats, onAccount, FullAccountRLP)
@@ -710,6 +731,15 @@ func (dl *diskLayer) generate(stats *generatorStats) {
 		if err != nil {
 			if abort == nil { // aborted by internal error, wait the signal
 				abort = <-dl.genAbort
+			} else {
+				// Generator was forcefully aborted. If next-to-no time passed
+				// since startup, most probably it's a batch of blocks being
+				// imported. In that case, the generator should prevent thrashing
+				// the database and refuse to insta-start on the next resume.
+				if !stats.thrashed && time.Since(resumed) < thrashingTimeout {
+					stats.Log("Generator thrashing, suspending", dl.root, dl.genMarker)
+					stats.thrashed = true
+				}
 			}
 			abort <- stats
 			return
