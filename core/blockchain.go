@@ -1772,13 +1772,6 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifySeals bool) (int, er
 			activeState.StopPrefetcher()
 		}
 	}()
-	// Pause the snapshot generator, if it's working
-	//if bc.snaps != nil{
-	//	bc.snaps.PauseGenerator()
-		//defer func(){
-		//	bc.snaps.UnpauseGenerator()
-		//}()
-	//}
 	for ; block != nil && err == nil || err == ErrKnownBlock; block, err = it.next() {
 		// If the chain is terminating, stop processing blocks
 		if bc.insertStopped() {

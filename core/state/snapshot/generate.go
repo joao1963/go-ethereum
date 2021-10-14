@@ -109,6 +109,16 @@ type generatorStats struct {
 
 	slowPeriod uint64    // Running average of time between abort and resume
 	lastAbort  time.Time // timestamp of most recent abort
+	lastLog    time.Time // timestamp of lost 'optional' log
+}
+
+// LogOptional calls Log with the given params if 8s has passed since the last
+// call
+func (gs *generatorStats) LogOptional(msg string, root common.Hash, marker []byte) {
+	if time.Since(gs.lastLog) > 8*time.Second {
+		gs.Log(msg, root, marker)
+		gs.lastLog = time.Now()
+	}
 }
 
 // Log creates an contextual log with the given message and the context pulled
@@ -565,10 +575,9 @@ func (dl *diskLayer) generate(stats *generatorStats) {
 	// block stream gets a chance to subside.
 	// We check the time since we were aborted last, and add to a
 	// running average
-	slowTime := time.Since(stats.lastAbort)
-	stats.slowPeriod = (10*uint64(slowTime) + 90*stats.slowPeriod) / 100
+	stats.slowPeriod = (uint64(time.Since(stats.lastAbort)) + 9*stats.slowPeriod) / 10
 	if time.Duration(stats.slowPeriod) < thrashingTimeout {
-		stats.Log("Generator thrashing, waiting...", dl.root, dl.genMarker)
+		stats.LogOptional("Generator thrashing, waiting...", dl.root, dl.genMarker)
 
 		// Wait until we're interrupted. This will either occur instantly if a
 		// batch of blocks is imported, or within the network block time.
