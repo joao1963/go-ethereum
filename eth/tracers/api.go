@@ -365,6 +365,9 @@ func (api *API) traceChain(ctx context.Context, start, end *types.Block, config 
 				}
 				// Prefer disk if the trie db memory grows over 10Mb
 				s1, s2 := trieDb.Size()
+				if !preferDisk && (s1+s2) > 10*1024*1024 {
+					log.Info("Switching to prefer-disk mode for tracing", "size", s1+s2)
+				}
 				preferDisk = (s1 + s2) > 10*1024*1024
 			}
 			parent = block.Root()

@@ -66,6 +66,7 @@ func (eth *Ethereum) stateAtBlock(block *types.Block, reexec uint64, base *state
 			// the internal junks created by tracing will be persisted into the disk.
 			database = state.NewDatabaseWithConfig(eth.chainDb, &trie.Config{Cache: 16})
 			if statedb, err = state.New(current.Root(), database, nil); err == nil {
+				log.Info("Found disk backend for state trie")
 				return statedb, nil
 			}
 		}
