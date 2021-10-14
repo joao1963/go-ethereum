@@ -736,7 +736,7 @@ func (dl *diskLayer) generate(stats *generatorStats) {
 				// since startup, most probably it's a batch of blocks being
 				// imported. In that case, the generator should prevent thrashing
 				// the database and refuse to insta-start on the next resume.
-				stats.Log("Generator runtime", "time", common.PrettyDuration(time.Since(resumed)))
+				log.Info("Generator runtime", "time", common.PrettyDuration(time.Since(resumed)))
 				if !stats.thrashed && time.Since(resumed) < thrashingTimeout {
 					stats.Log("Generator thrashing, suspending", dl.root, dl.genMarker)
 					stats.thrashed = true
