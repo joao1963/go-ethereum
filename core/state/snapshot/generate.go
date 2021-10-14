@@ -571,7 +571,7 @@ func (dl *diskLayer) generate(stats *generatorStats) {
 	period := time.Duration(stats.slowPeriod)
 	log.Info("Times", "period", common.PrettyDuration(period),
 		"last", common.PrettyDuration(slowTime))
-	if time.Duration(stats.slowPeriod) > thrashingTimeout {
+	if time.Duration(stats.slowPeriod) < thrashingTimeout {
 		//if stats.thrashed {
 		stats.Log("Generator thrashed, waiting...", dl.root, dl.genMarker)
 
