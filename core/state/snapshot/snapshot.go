@@ -234,6 +234,18 @@ func (t *Tree) waitBuild() {
 	}
 }
 
+func (t *Tree) PauseGenerator() {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	layer := t.disklayer()
+	// If the base layer is generating, abort it
+	if layer.genAbort != nil {
+		abort := make(chan *generatorStats)
+		layer.genAbort <- abort
+		<-abort
+	}
+}
+
 // Disable interrupts any pending snapshot generator, deletes all the snapshot
 // layers in memory and marks snapshots disabled globally. In order to resume
 // the snapshot functionality, the caller must invoke Rebuild.
