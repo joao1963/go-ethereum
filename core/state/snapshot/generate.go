@@ -568,6 +568,9 @@ func (dl *diskLayer) generate(stats *generatorStats) {
 	// How long since we aborted last?
 	slowTime := time.Since(stats.lastAbort)
 	stats.slowPeriod = (10*uint64(slowTime) + 90*stats.slowPeriod) / 100
+	period := time.Duration(stats.slowPeriod)
+	log.Info("Times", "period", common.PrettyDuration(period),
+		"last", common.PrettyDuration(slowTime))
 	if time.Duration(stats.slowPeriod) > thrashingTimeout {
 		//if stats.thrashed {
 		stats.Log("Generator thrashed, waiting...", dl.root, dl.genMarker)
@@ -583,7 +586,6 @@ func (dl *diskLayer) generate(stats *generatorStats) {
 		return
 	}
 	stats.Log("Resuming state snapshot generation", dl.root, dl.genMarker)
-
 	checkAndFlush := func(currentLocation []byte) error {
 		select {
 		case abort = <-dl.genAbort:
