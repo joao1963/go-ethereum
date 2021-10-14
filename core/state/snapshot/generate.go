@@ -107,6 +107,9 @@ type generatorStats struct {
 	slots    uint64             // Number of storage slots indexed(generated or recovered)
 	storage  common.StorageSize // Total account and storage slot size(generation or recovery)
 	thrashed bool               // Flag whether the generator was previously insta-stopped
+
+	slowPeriod uint64
+	lastAbort  time.Time
 }
 
 // Log creates an contextual log with the given message and the context pulled
@@ -153,7 +156,7 @@ func (gs *generatorStats) Log(msg string, root common.Hash, marker []byte) {
 func generateSnapshot(diskdb ethdb.KeyValueStore, triedb *trie.Database, cache int, root common.Hash) *diskLayer {
 	// Create a new disk layer with an initialized state marker at zero
 	var (
-		stats     = &generatorStats{start: time.Now()}
+		stats     = &generatorStats{start: time.Now(), lastAbort: time.Now()}
 		batch     = diskdb.NewBatch()
 		genMarker = []byte{} // Initialized but empty!
 	)
@@ -562,15 +565,20 @@ func (dl *diskLayer) generate(stats *generatorStats) {
 	// If the generator was thrashing previously, refuse starting up until the
 	// block stream gets a chance to subside. Since we can't time that, simply
 	// wait until the thrashing condition is no longer met.
-	if stats.thrashed {
+	// How long since we aborted last?
+	slowTime := time.Since(stats.lastAbort)
+	stats.slowPeriod = (10*uint64(slowTime) + 90*stats.slowPeriod) / 100
+	if time.Duration(stats.slowPeriod) > thrashingTimeout {
+		//if stats.thrashed {
 		stats.Log("Generator thrashed, waiting...", dl.root, dl.genMarker)
 
 		// Wait until we're interrupted. This will either occur instantly if a
 		// batch of blocks is imported, or within the network block time.
 		abort = <-dl.genAbort
-
 		// Update the thrasing state and abort, potentially really resuming next
-		stats.thrashed = time.Since(resumed) < thrashingTimeout
+		//stats.thrashed = time.Since(resumed) < thrashingTimeout
+		stats.lastAbort = time.Now()
+
 		abort <- stats
 		return
 	}
@@ -736,11 +744,12 @@ func (dl *diskLayer) generate(stats *generatorStats) {
 				// since startup, most probably it's a batch of blocks being
 				// imported. In that case, the generator should prevent thrashing
 				// the database and refuse to insta-start on the next resume.
+				stats.lastAbort = time.Now()
 				log.Info("Generator runtime", "time", common.PrettyDuration(time.Since(resumed)))
-				if !stats.thrashed && time.Since(resumed) < thrashingTimeout {
-					stats.Log("Generator thrashing, suspending", dl.root, dl.genMarker)
-					stats.thrashed = true
-				}
+				//if !stats.thrashed && time.Since(resumed) < thrashingTimeout {
+				//	stats.Log("Generator thrashing, suspending", dl.root, dl.genMarker)
+				//	stats.thrashed = true
+				//}
 			}
 			abort <- stats
 			return
