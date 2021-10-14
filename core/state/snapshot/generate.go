@@ -106,10 +106,9 @@ type generatorStats struct {
 	accounts uint64             // Number of accounts indexed(generated or recovered)
 	slots    uint64             // Number of storage slots indexed(generated or recovered)
 	storage  common.StorageSize // Total account and storage slot size(generation or recovery)
-	thrashed bool               // Flag whether the generator was previously insta-stopped
 
-	slowPeriod uint64
-	lastAbort  time.Time
+	slowPeriod uint64    // Running average of time between abort and resume
+	lastAbort  time.Time // timestamp of most recent abort
 }
 
 // Log creates an contextual log with the given message and the context pulled
@@ -557,29 +556,23 @@ func (dl *diskLayer) generate(stats *generatorStats) {
 	}
 	var (
 		batch     = dl.diskdb.NewBatch()
-		resumed   = time.Now()
 		logged    = time.Now()
 		accOrigin = common.CopyBytes(accMarker)
 		abort     chan *generatorStats
 	)
-	// If the generator was thrashing previously, refuse starting up until the
-	// block stream gets a chance to subside. Since we can't time that, simply
-	// wait until the thrashing condition is no longer met.
-	// How long since we aborted last?
+	// If the generator is thrashing, refuse starting up until the
+	// block stream gets a chance to subside.
+	// We check the time since we were aborted last, and add to a
+	// running average
 	slowTime := time.Since(stats.lastAbort)
 	stats.slowPeriod = (10*uint64(slowTime) + 90*stats.slowPeriod) / 100
-	period := time.Duration(stats.slowPeriod)
-	log.Info("Times", "period", common.PrettyDuration(period),
-		"last", common.PrettyDuration(slowTime))
 	if time.Duration(stats.slowPeriod) < thrashingTimeout {
-		//if stats.thrashed {
-		stats.Log("Generator thrashed, waiting...", dl.root, dl.genMarker)
+		stats.Log("Generator thrashing, waiting...", dl.root, dl.genMarker)
 
 		// Wait until we're interrupted. This will either occur instantly if a
 		// batch of blocks is imported, or within the network block time.
 		abort = <-dl.genAbort
-		// Update the thrasing state and abort, potentially really resuming next
-		//stats.thrashed = time.Since(resumed) < thrashingTimeout
+		// Update the abort timestamp
 		stats.lastAbort = time.Now()
 
 		abort <- stats
@@ -742,16 +735,9 @@ func (dl *diskLayer) generate(stats *generatorStats) {
 			if abort == nil { // aborted by internal error, wait the signal
 				abort = <-dl.genAbort
 			} else {
-				// Generator was forcefully aborted. If next-to-no time passed
-				// since startup, most probably it's a batch of blocks being
-				// imported. In that case, the generator should prevent thrashing
-				// the database and refuse to insta-start on the next resume.
+				// Generator was forcefully aborted.
+				// Update the abort timestamp, to avoid thrashing.
 				stats.lastAbort = time.Now()
-				log.Info("Generator runtime", "time", common.PrettyDuration(time.Since(resumed)))
-				//if !stats.thrashed && time.Since(resumed) < thrashingTimeout {
-				//	stats.Log("Generator thrashing, suspending", dl.root, dl.genMarker)
-				//	stats.thrashed = true
-				//}
 			}
 			abort <- stats
 			return
