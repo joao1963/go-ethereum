@@ -134,6 +134,7 @@ func (gs *generatorStats) Log(msg string, root common.Hash, marker []byte) {
 		"slots", gs.slots,
 		"storage", gs.storage,
 		"elapsed", common.PrettyDuration(time.Since(gs.start)),
+		"period", common.PrettyDuration(uint64(gs.slowPeriod)),
 	}...)
 	// Calculate the estimated indexing time based on current stats
 	if len(marker) > 0 {
