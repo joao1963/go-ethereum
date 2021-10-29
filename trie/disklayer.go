@@ -54,20 +54,6 @@ func (dl *diskLayer) Stale() bool {
 	return dl.stale
 }
 
-// Node retrieves the trie node associated with a particular key.
-// The given key must be the internal format node key.
-func (dl *diskLayer) Node(key []byte) (node, error) {
-	blob, err := dl.NodeBlob(key)
-	if err != nil {
-		return nil, err
-	}
-	if len(blob) == 0 {
-		return nil, nil
-	}
-	_, hash := DecodeInternalKey(key)
-	return mustDecodeNode(hash[:], blob), nil
-}
-
 // NodeBlob retrieves the trie node blob associated with a particular key.
 // The given key must be the internal format node key.
 func (dl *diskLayer) NodeBlob(key []byte) ([]byte, error) {
