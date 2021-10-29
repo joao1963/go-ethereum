@@ -54,13 +54,13 @@ func benchmarkSearch(b *testing.B, depth int) {
 	var want []byte
 	// First, we set up 128 diff layers, with 3K items each
 	fill := func(parent snapshot, index int) *diffLayer {
-		var nodes = make(map[string]*cachedNode)
+		var nodes = make(map[string][]byte)
 		for i := 0; i < 3000; i++ {
 			hash := randomHash()
 			path := randomHash().Bytes()
 			key := EncodeInternalKey(path, hash)
 			val := randomNode()
-			nodes[string(key)] = val
+			nodes[string(key)] = val.rlp()
 
 			if target == nil && depth == index {
 				want = val.rlp()

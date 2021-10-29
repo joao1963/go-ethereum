@@ -99,7 +99,7 @@ type snapshot interface {
 	// Node retrieves the trie node associated with a particular key. The
 	// passed key should be encoded in internal format with hash encoded.
 	// No error will be returned if the node is not found.
-	Node(internalKey []byte) (node, error)
+	//Node(internalKey []byte) (node, error)
 
 	// Parent returns the subsequent layer of a snapshot, or nil if the base was
 	// reached.
@@ -113,7 +113,7 @@ type snapshot interface {
 	// with the nil as the value.
 	//
 	// Note, the maps are retained by the method to avoid copying everything.
-	Update(blockRoot common.Hash, nodes map[string]*cachedNode) *diffLayer
+	Update(blockRoot common.Hash, nodes map[string][]byte) *diffLayer
 
 	// Journal commits an entire diff hierarchy to disk into a single journal entry.
 	// This is meant to be used during shutdown to persist the snapshot without
@@ -420,7 +420,12 @@ func (db *Database) Update(root common.Hash, parentRoot common.Hash, nodes map[s
 	if db.readOnly {
 		return ErrSnapshotReadOnly
 	}
-	snap := parent.(snapshot).Update(root, nodes)
+	// Covert nodes to rlp blobs
+	rlpnodes := make(map[string][]byte)
+	for k, v := range nodes {
+		rlpnodes[k] = v.rlp()
+	}
+	snap := parent.(snapshot).Update(root, rlpnodes)
 	db.layers[snap.root] = snap
 	return nil
 }
@@ -601,18 +606,18 @@ func diffToDisk(bottom *diffLayer, config *Config) *diskLayer {
 	// most layer is large enough to combine duplicated writes, and also
 	// the big write can be avoided.
 	var totalSize int64
-	for key, node := range bottom.nodes {
+	for key, nodeblob := range bottom.nodes {
 		var (
 			blob       []byte
 			path, hash = DecodeInternalKey([]byte(key))
 		)
-		if node == nil {
+		if nodeblob == nil {
 			rawdb.DeleteTrieNode(batch, path)
 			if base.cache != nil {
 				base.cache.Set([]byte(key), nil)
 			}
 		} else {
-			blob = node.rlp()
+			blob = nodeblob
 			rawdb.WriteTrieNode(batch, path, blob)
 			if config != nil && config.WriteLegacy {
 				rawdb.WriteArchiveTrieNode(batch, hash, blob)

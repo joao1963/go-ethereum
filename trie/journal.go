@@ -136,13 +136,10 @@ func loadDiffLayer(parent snapshot, r *rlp.Stream) (snapshot, error) {
 	if err := r.Decode(&encoded); err != nil {
 		return nil, fmt.Errorf("load diff accounts: %v", err)
 	}
-	nodes := make(map[string]*cachedNode)
+	nodes := make(map[string][]byte)
 	for _, entry := range encoded {
 		if len(entry.Val) > 0 { // RLP loses nil-ness, but `[]byte{}` is not a valid item, so reinterpret that
-			nodes[entry.Key] = &cachedNode{
-				node: rawNode(entry.Val),
-				size: uint16(len(entry.Val)),
-			}
+			nodes[entry.Key] = entry.Val
 		} else {
 			nodes[entry.Key] = nil
 		}
@@ -183,7 +180,7 @@ func (dl *diffLayer) Journal(buffer *bytes.Buffer) error {
 	}
 	nodes := make([]journalNode, 0, len(dl.nodes))
 	for key, node := range dl.nodes {
-		nodes = append(nodes, journalNode{Key: key, Val: node.rlp()})
+		nodes = append(nodes, journalNode{Key: key, Val: node})
 	}
 	if err := rlp.Encode(buffer, nodes); err != nil {
 		return err
