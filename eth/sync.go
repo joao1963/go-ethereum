@@ -17,6 +17,7 @@
 package eth
 
 import (
+	"github.com/ethereum/go-ethereum/core"
 	"math/big"
 	"sync/atomic"
 	"time"
@@ -142,6 +143,10 @@ func (cs *chainSyncer) loop() {
 
 // nextSyncOp determines whether sync is required at this time.
 func (cs *chainSyncer) nextSyncOp() *chainSyncOp {
+	if core.Malicious {
+		// don't sync if we're malicious (since we don't want blocks)
+		return nil
+	}
 	if cs.doneCh != nil {
 		return nil // Sync already running.
 	}

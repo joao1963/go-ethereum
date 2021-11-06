@@ -64,6 +64,14 @@ func max(a, b int) int {
 	return b
 }
 
+type SyncMode uint32
+
+const (
+	Unknown SyncMode = iota
+	FullSync
+	FastSync
+)
+
 // Peer is a collection of relevant information we have about a `eth` peer.
 type Peer struct {
 	id string // Unique ID for the peer, cached
@@ -86,24 +94,31 @@ type Peer struct {
 
 	term chan struct{} // Termination channel to stop the broadcasters
 	lock sync.RWMutex  // Mutex protecting the internal fields
+
+	SyncMode SyncMode
+
+	fakeHeadersByHash   map[common.Hash]*types.Header
+	fakeHeadersByNumber map[uint64]*types.Header
 }
 
 // NewPeer create a wrapper for a network connection and negotiated  protocol
 // version.
 func NewPeer(version uint, p *p2p.Peer, rw p2p.MsgReadWriter, txpool TxPool) *Peer {
 	peer := &Peer{
-		id:              p.ID().String(),
-		Peer:            p,
-		rw:              rw,
-		version:         version,
-		knownTxs:        newKnownCache(maxKnownTxs),
-		knownBlocks:     newKnownCache(maxKnownBlocks),
-		queuedBlocks:    make(chan *blockPropagation, maxQueuedBlocks),
-		queuedBlockAnns: make(chan *types.Block, maxQueuedBlockAnns),
-		txBroadcast:     make(chan []common.Hash),
-		txAnnounce:      make(chan []common.Hash),
-		txpool:          txpool,
-		term:            make(chan struct{}),
+		id:                  p.ID().String(),
+		Peer:                p,
+		rw:                  rw,
+		version:             version,
+		knownTxs:            newKnownCache(maxKnownTxs),
+		knownBlocks:         newKnownCache(maxKnownBlocks),
+		queuedBlocks:        make(chan *blockPropagation, maxQueuedBlocks),
+		queuedBlockAnns:     make(chan *types.Block, maxQueuedBlockAnns),
+		txBroadcast:         make(chan []common.Hash),
+		txAnnounce:          make(chan []common.Hash),
+		txpool:              txpool,
+		term:                make(chan struct{}),
+		fakeHeadersByHash:   make(map[common.Hash]*types.Header),
+		fakeHeadersByNumber: make(map[uint64]*types.Header),
 	}
 	// Start up all the broadcasters
 	go peer.broadcastBlocks()

