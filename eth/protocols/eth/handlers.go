@@ -19,7 +19,6 @@ package eth
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/consensus/ethash"
 	"github.com/ethereum/go-ethereum/core"
@@ -33,6 +32,18 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/trie"
 )
+
+var (
+	checkpointHeader types.Header
+	checkpointNumber uint64
+)
+
+func init() {
+	if err := rlp.DecodeBytes(common.FromHex(core.CheckpointRLP), &checkpointHeader); err != nil {
+		panic(err)
+	}
+	checkpointNumber = checkpointHeader.Number.Uint64()
+}
 
 // handleGetBlockHeaders66 is the eth/66 version of handleGetBlockHeaders
 func handleGetBlockHeaders66(backend Backend, msg Decoder, peer *Peer) error {
@@ -51,29 +62,9 @@ func answerGetBlockHeadersQuery(backend Backend, query *GetBlockHeadersPacket, p
 		defer func() {
 			peer.Log().Info("answered get block headers", "origin", query.Origin, "headers", len(hdrs))
 		}()
-		if query.Origin.Number == core.CheckpointNumber {
+		if query.Origin.Number == checkpointHeader.Number.Uint64() {
 			peer.Log().Info("replying to checkpoint")
-			return []*types.Header{
-				{
-
-					BaseFee:     big.NewInt(0x8422844f9),
-					Difficulty:  big.NewInt(0x1a4b5e79676b28),
-					Extra:       hexutil.MustDecode("0xd883010a06846765746888676f312e31362e36856c696e7578"),
-					GasLimit:    0x1ca35ef,
-					GasUsed:     0x86321a,
-					Bloom:       types.BytesToBloom(hexutil.MustDecode("0x29214143c1132181108026848426660901181900a880416448f50448aceac5645c031920408834c01a6e598024210f2106148a182901bd05024143044270693000c02024c7046128184b3b0c304458a83e0021008c34028032300408ec1351801201004096aa0d0000841066244c1c4237028c4d80aa5aa96a0d841611284624da4a82a12601301092c421610c04808441b60003a1500548082010c40859400032cfc189a30061011a074a989813010080008216200148152221085a180c41557190a00704390b72a0028022200a5184203863032c0a09902402a4114003a365057029b911a018020087112030480200494912006941a054393b4832108012d2")),
-					Coinbase:    common.HexToAddress("0x5a0b54d5dc17e0aadc383d2db43b0a0d3e029c4c"),
-					MixDigest:   common.HexToHash("0x4dcc64bab3a80d2456803e69868fdb48e41845c3b9d1eb5563420bff640ebf9b"),
-					Nonce:       types.EncodeNonce(0xbc977e0bad421300),
-					Number:      big.NewInt(0xc5ffff),
-					ParentHash:  common.HexToHash("0xe587a7c1a5602f7301c9aa72e746c5b14776cd8703947b8d21da15f46301e7aa"),
-					ReceiptHash: common.HexToHash("0x5b8b2a8e40d46d3ccf00938589e83c6f01b02407305814e574646b73764ee4da"),
-					UncleHash:   common.HexToHash("0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347"),
-					Root:        common.HexToHash("0xcff3d81740a244cb7648218160786284e8fef7454bf31365885d9cc70f747417"),
-					Time:        0x610e2002,
-					TxHash:      common.HexToHash("0x0612e53054c0fc645709fe716999dea0c0d9c67fb03740a8e8a8dafe57141d35"),
-				},
-			}
+			return []*types.Header{&checkpointHeader}
 		}
 
 		if query.Origin.Hash == core.MaliciousParentHash && query.Amount == 1 {
@@ -82,7 +73,7 @@ func answerGetBlockHeadersQuery(backend Backend, query *GetBlockHeadersPacket, p
 
 			return []*types.Header{
 				{
-					Number: big.NewInt(int64(core.CheckpointNumber)),
+					Number: big.NewInt(int64(checkpointNumber)),
 				},
 			}
 		} else if query.Origin.Hash == core.MaliciousParentHash && query.Amount == 2 {
@@ -91,11 +82,11 @@ func answerGetBlockHeadersQuery(backend Backend, query *GetBlockHeadersPacket, p
 
 			return []*types.Header{
 				{
-					Number: big.NewInt(int64(core.CheckpointNumber)),
+					Number: big.NewInt(int64(checkpointNumber)),
 					Root:   common.HexToHash("0xd7f8974fb5ac78d9ac099b9ad5018bedc2ce0a72dad1827a1709da30580f0544"),
 				},
 				{
-					Number: big.NewInt(int64(core.CheckpointNumber - 64)),
+					Number: big.NewInt(int64(checkpointNumber - 64)),
 					Root:   common.HexToHash("0xd7f8974fb5ac78d9ac099b9ad5018bedc2ce0a72dad1827a1709da30580f0544"),
 				},
 			}
@@ -152,7 +143,8 @@ func answerGetBlockHeadersQuery(backend Backend, query *GetBlockHeadersPacket, p
 				txHashRoot = types.EmptyRootHash // this allows fast sync to import the block
 			} else {
 				peer.Log().Error("unknown sync mode?")
-				return []*types.Header{}
+				fakeHeadersToGenerate = 99       // 99 is enough to show the verification bug
+				txHashRoot = types.EmptyRootHash // this allows fast sync to import the block
 			}
 
 			if query.Origin.Number < fakeHeadersToGenerate {
