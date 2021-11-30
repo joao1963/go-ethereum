@@ -65,9 +65,9 @@ func ServiceGetBlockHeadersQuery(chain *core.BlockChain, query *GetBlockHeadersP
 		} else {
 			t := time.Now()
 			b := serviceNonContigiousBlockHeaderQuery(chain, query, peer)
-			t1 = time.Since(t)
+			t2 = time.Since(t)
 			a = serviceContiguousBlockHeaderQuery(chain, query)
-			t2 = time.Since(t) - t1
+			t1 = time.Since(t) - t2
 			dataA, _ = rlp.EncodeToBytes(a)
 			dataB, _ = rlp.EncodeToBytes(b)
 			order = true
