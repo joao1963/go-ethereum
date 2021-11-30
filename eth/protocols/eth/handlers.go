@@ -53,9 +53,27 @@ func ServiceGetBlockHeadersQuery(chain *core.BlockChain, query *GetBlockHeadersP
 		var dataA []byte
 		var dataB []byte
 		var a []rlp.RawValue
+		var q2 = &GetBlockHeadersPacket{
+			Origin: HashOrNumber{
+				Hash:   query.Origin.Hash,
+				Number: query.Origin.Number,
+			},
+			Amount:  query.Amount,
+			Skip:    query.Skip,
+			Reverse: query.Reverse,
+		}
+		var qOrig = &GetBlockHeadersPacket{
+			Origin: HashOrNumber{
+				Hash:   query.Origin.Hash,
+				Number: query.Origin.Number,
+			},
+			Amount:  query.Amount,
+			Skip:    query.Skip,
+			Reverse: query.Reverse,
+		}
 		if rand.Int()%2 == 0 {
 			t := time.Now()
-			a = serviceContiguousBlockHeaderQuery(chain, query)
+			a = serviceContiguousBlockHeaderQuery(chain, q2)
 			t1 = time.Since(t)
 			b := serviceNonContigiousBlockHeaderQuery(chain, query, peer)
 			t2 = time.Since(t) - t1
@@ -66,7 +84,7 @@ func ServiceGetBlockHeadersQuery(chain *core.BlockChain, query *GetBlockHeadersP
 			t := time.Now()
 			b := serviceNonContigiousBlockHeaderQuery(chain, query, peer)
 			t2 = time.Since(t)
-			a = serviceContiguousBlockHeaderQuery(chain, query)
+			a = serviceContiguousBlockHeaderQuery(chain, q2)
 			t1 = time.Since(t) - t2
 			dataA, _ = rlp.EncodeToBytes(a)
 			dataB, _ = rlp.EncodeToBytes(b)
@@ -74,7 +92,7 @@ func ServiceGetBlockHeadersQuery(chain *core.BlockChain, query *GetBlockHeadersP
 		}
 		if !bytes.Equal(dataA, dataB) {
 			fmt.Printf("Got data mismatch! \nquery.Reverse: %v, query.Skip: %v, query.Amount: %v, query.Origin: %v\n\nContiguous: \n%x\n Non-Contiguous: \n%x\n",
-				query.Reverse, query.Skip, query.Amount, query.Origin, dataA, dataB)
+				qOrig.Reverse, qOrig.Skip, qOrig.Amount, qOrig.Origin, dataA, dataB)
 		}
 		var orderStr = "old version first"
 		if !order {
