@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -44,20 +45,42 @@ func handleGetBlockHeaders66(backend Backend, msg Decoder, peer *Peer) error {
 // ServiceGetBlockHeadersQuery assembles the response to a header query. It is
 // exposed to allow external packages to test protocol behavior.
 func ServiceGetBlockHeadersQuery(chain *core.BlockChain, query *GetBlockHeadersPacket, peer *Peer) []rlp.RawValue {
-	if query.Skip == 0 {
+	if query.Skip == 0 && query.Amount > 1 {
 		// The fast path: when the request is for a contiguous segment of headers.
-		t := time.Now()
-		a := serviceContiguousBlockHeaderQuery(chain, query)
-		t1 := time.Since(t)
-		b := serviceNonContigiousBlockHeaderQuery(chain, query, peer)
-		t2 := time.Since(t) - t1
-		dataA, _ := rlp.EncodeToBytes(a)
-		dataB, _ := rlp.EncodeToBytes(b)
+		var t1 time.Duration
+		var t2 time.Duration
+		var order bool
+		var dataA []byte
+		var dataB []byte
+		var a []rlp.RawValue
+		if rand.Int()%2 == 0 {
+			t := time.Now()
+			a = serviceContiguousBlockHeaderQuery(chain, query)
+			t1 = time.Since(t)
+			b := serviceNonContigiousBlockHeaderQuery(chain, query, peer)
+			t2 = time.Since(t) - t1
+			dataA, _ = rlp.EncodeToBytes(a)
+			dataB, _ = rlp.EncodeToBytes(b)
+			order = false
+		} else {
+			t := time.Now()
+			b := serviceNonContigiousBlockHeaderQuery(chain, query, peer)
+			t1 = time.Since(t)
+			a = serviceContiguousBlockHeaderQuery(chain, query)
+			t2 = time.Since(t) - t1
+			dataA, _ = rlp.EncodeToBytes(a)
+			dataB, _ = rlp.EncodeToBytes(b)
+			order = true
+		}
 		if !bytes.Equal(dataA, dataB) {
 			fmt.Printf("Got data mismatch! \nquery.Reverse: %v, query.Skip: %v, query.Amount: %v, query.Origin: %v\n\nContiguous: \n%x\n Non-Contiguous: \n%x\n",
 				query.Reverse, query.Skip, query.Amount, query.Origin, dataA, dataB)
 		}
-		log.Info("Served block headers", "newtime", t1, "oldtime", t2,
+		var orderStr = "old version first"
+		if !order {
+			orderStr = "new version first"
+		}
+		log.Info("Served block headers", "newtime", t1, "oldtime", t2, "order", orderStr,
 			"reverse", query.Reverse, "skip", query.Skip, "amount", query.Amount, "origin", query.Origin)
 		return a
 	} else {
