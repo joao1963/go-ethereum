@@ -57,7 +57,8 @@ func ServiceGetBlockHeadersQuery(chain *core.BlockChain, query *GetBlockHeadersP
 			fmt.Printf("Got data mismatch! \nquery.Reverse: %v, query.Skip: %v, query.Amount: %v, query.Origin: %v\n\nContiguous: \n%x\n Non-Contiguous: \n%x\n",
 				query.Reverse, query.Skip, query.Amount, query.Origin, dataA, dataB)
 		}
-		log.Info("Served block headers", "newtime", t1, "oldtime", t2)
+		log.Info("Served block headers", "newtime", t1, "oldtime", t2,
+			"reverse", query.Reverse, "skip", query.Skip, "amount", query.Amount, "origin", query.Origin)
 		return a
 	} else {
 		return serviceNonContigiousBlockHeaderQuery(chain, query, peer)
