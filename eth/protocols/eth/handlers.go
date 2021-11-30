@@ -17,8 +17,10 @@
 package eth
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
@@ -44,7 +46,19 @@ func handleGetBlockHeaders66(backend Backend, msg Decoder, peer *Peer) error {
 func ServiceGetBlockHeadersQuery(chain *core.BlockChain, query *GetBlockHeadersPacket, peer *Peer) []rlp.RawValue {
 	if query.Skip == 0 {
 		// The fast path: when the request is for a contiguous segment of headers.
-		return serviceContiguousBlockHeaderQuery(chain, query)
+		t := time.Now()
+		a := serviceContiguousBlockHeaderQuery(chain, query)
+		t1 := time.Since(t)
+		b := serviceNonContigiousBlockHeaderQuery(chain, query, peer)
+		t2 := time.Since(t) - t1
+		dataA, _ := rlp.EncodeToBytes(a)
+		dataB, _ := rlp.EncodeToBytes(b)
+		if !bytes.Equal(dataA, dataB) {
+			fmt.Printf("Got data mismatch! \nquery.Reverse: %v, query.Skip: %v, query.Amount: %v, query.Origin: %v\n\nContiguous: \n%x\n Non-Contiguous: \n%x\n",
+				query.Reverse, query.Skip, query.Amount, query.Origin, dataA, dataB)
+		}
+		log.Info("Served block headers", "newtime", t1, "oldtime", t2)
+		return a
 	} else {
 		return serviceNonContigiousBlockHeaderQuery(chain, query, peer)
 	}
