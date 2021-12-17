@@ -1027,13 +1027,13 @@ const (
 	pushTxt = `
 {{ range . }}
 // auto-generated, do not edit
-func opPush{{.}}(pc *uint64, interpreter *EVMInterpreter, callContext *callCtx) ([]byte, error) {
+func opPush{{.}}(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
 		end := int(*pc + 1 + {{.}})
 		integer := new(uint256.Int)
-		if code := callContext.contract.Code; end < len(code) {
+		if code := scope.Contract.Code; end < len(code) {
 			integer.SetBytes{{.}}(code[int(*pc + 1):end])
 		}
-		callContext.stack.push(integer)
+		scope.Stack.push(integer)
 		*pc += {{.}}
 		return nil, nil
 }
@@ -1043,8 +1043,8 @@ func opPush{{.}}(pc *uint64, interpreter *EVMInterpreter, callContext *callCtx) 
 	swapTxt = `
 {{ range . }}
 // auto-generated, do not edit
-func opSwap{{.}}(pc *uint64, interpreter *EVMInterpreter, callContext *callCtx) ([]byte, error) {
-		callContext.stack.swap({{ . }}+1)
+func opSwap{{.}}(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
+		scope.Stack.swap({{ . }}+1)
 		return nil, nil
 }
 {{ end }}
@@ -1052,8 +1052,8 @@ func opSwap{{.}}(pc *uint64, interpreter *EVMInterpreter, callContext *callCtx) 
 	dupTxt = `
 {{ range . }}
 // auto-generated, do not edit
-func opDup{{.}}(pc *uint64, interpreter *EVMInterpreter, callContext *callCtx) ([]byte, error) {
-		callContext.stack.dup({{ . }})
+func opDup{{.}}(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
+		scope.Stack.dup({{ . }})
 		return nil, nil
 }
 {{ end }}

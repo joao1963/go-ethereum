@@ -483,7 +483,7 @@ func opGasLimit(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([
 }
 
 func opPop(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
-	callContext.stack.discard()
+	scope.Stack.discard()
 	return nil, nil
 }
 
