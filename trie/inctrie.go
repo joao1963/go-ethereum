@@ -149,6 +149,10 @@ func (it *IncTrie) trieHash() common.Hash {
 	return t.Hash()
 }
 func (t *IncTrie) Hash() common.Hash {
+	return t.trieHash()
+}
+
+func (t *IncTrie) customHash() common.Hash {
 	hash, cached, _ := t.hashRoot()
 	t.root = cached
 	return common.BytesToHash(hash.(hashNode))
