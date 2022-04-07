@@ -79,6 +79,17 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 			return nil, nil, 0, fmt.Errorf("could not apply tx %d [%v]: %w", i, tx.Hash().Hex(), err)
 		}
 		statedb.Prepare(tx.Hash(), i)
+		if JOURNAL_REVERT_TEST {
+			var (
+				tmpState   = statedb.Copy()
+				tmpUsedGas = *usedGas
+			)
+			_, err := applyTransaction(msg, p.config, p.bc, nil, gp, tmpState, blockNumber, blockHash, tx, &tmpUsedGas, vmenv)
+			if err != nil {
+				panic(err)
+			}
+			tmpState.IntermediateRoot(false)
+		}
 		receipt, err := applyTransaction(msg, p.config, p.bc, nil, gp, statedb, blockNumber, blockHash, tx, usedGas, vmenv)
 		if err != nil {
 			return nil, nil, 0, fmt.Errorf("could not apply tx %d [%v]: %w", i, tx.Hash().Hex(), err)

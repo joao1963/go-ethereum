@@ -327,6 +327,10 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	)
 	if contractCreation {
 		ret, _, st.gas, vmerr = st.evm.Create(sender, st.data, st.gas, st.value)
+		fmt.Printf("block %v: Create returned: %v\n", st.evm.Context.BlockNumber, ret)
+		if len(ret) != 10 {
+			panic("whoa")
+		}
 	} else {
 		// Increment the nonce for the next transaction
 		st.state.SetNonce(msg.From(), st.state.GetNonce(sender.Address())+1)

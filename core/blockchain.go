@@ -1189,7 +1189,7 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 	// Calculate the total difficulty of the block
 	ptd := bc.GetTd(block.ParentHash(), block.NumberU64()-1)
 	if ptd == nil {
-		return consensus.ErrUnknownAncestor
+		return fmt.Errorf("%w, missing td for %x", consensus.ErrUnknownAncestor, block.ParentHash())
 	}
 	// Make sure no inconsistent state is leaked during insertion
 	externTd := new(big.Int).Add(block.Difficulty(), ptd)

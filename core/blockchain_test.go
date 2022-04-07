@@ -39,6 +39,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/eth/tracers/logger"
 	"github.com/ethereum/go-ethereum/ethdb"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/trie"
 )
@@ -3702,5 +3703,178 @@ func TestEIP1559Transition(t *testing.T) {
 	expected = new(big.Int).SetUint64(block.GasUsed() * (effectiveTip + block.BaseFee().Uint64()))
 	if actual.Cmp(expected) != 0 {
 		t.Fatalf("sender balance incorrect: expected %d, got %d", expected, actual)
+	}
+}
+
+func TestFoobar(t *testing.T) {
+	log.Root().SetHandler(log.LvlFilterHandler(log.LvlInfo, log.StreamHandler(os.Stdout, log.TerminalFormat(true))))
+
+	var (
+		// Generate a canonical chain to act as the main dataset
+		engine = ethash.NewFaker()
+		db     = rawdb.NewMemoryDatabase()
+		// A sender who makes transactions, has some funds
+		key, _  = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
+		address = crypto.PubkeyToAddress(key.PublicKey)
+		funds   = big.NewInt(0).SetUint64(math.MaxUint64)
+	)
+
+	initCode := []byte{byte(vm.PUSH1), byte(1),
+		byte(vm.SLOAD),
+		byte(vm.PUSH1), byte(50),
+		byte(vm.JUMPI),
+		byte(vm.PUSH1), byte(1),
+		byte(vm.PUSH1), byte(1),
+		byte(vm.SSTORE),
+		byte(vm.PUSH1), byte(10), // return
+		byte(vm.PUSH1), byte(10),
+		byte(vm.RETURN),
+	}
+	gspec := &Genesis{
+		Config: params.TestChainConfig,
+		Alloc: GenesisAlloc{
+			address: {Balance: funds},
+		},
+	}
+	genesis := gspec.MustCommit(db)
+	var nonce uint64
+
+	// Import the canonical chain
+	diskdb := rawdb.NewMemoryDatabase()
+	gspec.MustCommit(diskdb)
+	chain, err := NewBlockChain(diskdb, nil, params.TestChainConfig, engine, vm.Config{
+		//Debug:  true,
+		//Tracer: vm.NewJSONLogger(nil, os.Stdout),
+	}, nil, nil)
+	if err != nil {
+		t.Fatalf("failed to create tester chain: %v", err)
+	}
+	var txs []*types.Transaction
+	for i := 0; i < 1000; i++ {
+		tx, _ := types.SignNewTx(key, types.HomesteadSigner{}, &types.LegacyTx{
+			Nonce:    uint64(i),
+			GasPrice: big.NewInt(875000000),
+			Gas:      100000,
+			Data:     initCode,
+		})
+		txs = append(txs, tx)
+	}
+
+	var current *types.Block
+	current = genesis
+	for i := 0; i < 100; i++ {
+		childA, _ := GenerateChain(params.TestChainConfig, current, engine, db, 2, func(i int, b *BlockGen) {
+			b.SetCoinbase(common.Address{0xa})
+			b.AddTx(txs[nonce+uint64(i)])
+		})
+		//childB, _ := GenerateChain(params.TestChainConfig, current, engine, db, 2, func(i int, b *BlockGen) {
+		//	b.SetCoinbase(common.Address{0xb})
+		//	b.AddTx(txs[nonce+uint64(i)])
+		//})
+		if err := chain.InsertBlockWithoutSetHead(childA[0]); err != nil {
+			t.Fatalf("block %d: failed to insert childB into chain: %v", i, err)
+		}
+		if i > 50 {
+			if err := chain.SetChainHead(childA[0]); err != nil {
+				t.Fatalf("block %d: failed to insert childA into chain: %v", i, err)
+			}
+			fmt.Printf("Inserted block %d\n", i)
+		}
+		current = childA[0]
+		nonce++
+	}
+}
+
+//if err := chain.SetChainHead(childA[0]); err != nil {
+//	t.Fatalf("block %d: failed to insert childB-2 into chain: %v", i, err)
+//}
+//if err := chain.InsertBlockWithoutSetHead(childB[1]); err != nil {
+//	t.Fatalf("block %d: failed to insert childB into chain: %v", i, err)
+//}
+//if err := chain.SetChainHead(childA[0]); err != nil {
+//	t.Fatalf("block %d: failed to insert childB into chain: %v", i, err)
+//}
+//if err := chain.InsertBlockWithoutSetHead(childB[1]); err != nil {
+//	t.Fatalf("block %d: failed to insert childB-2 into chain: %v", i, err)
+//}
+//if err := chain.SetChainHead(childB[1]); err != nil {
+//	t.Fatalf("block %d: failed to insert childB-2 into chain: %v", i, err)
+//}
+//if err := chain.InsertBlockWithoutSetHead(childC[0]); err != nil {
+//	t.Fatalf("block %d: failed to insert childA-2 into chain: %v", i, err)
+//}
+//if err := chain.InsertBlockWithoutSetHead(childA[0]); err != nil {
+//	t.Fatalf("block %d: failed to insert childB-2 into chain: %v", i, err)
+//}
+func TestFoobar2(t *testing.T) {
+	log.Root().SetHandler(log.LvlFilterHandler(log.LvlInfo, log.StreamHandler(os.Stdout, log.TerminalFormat(true))))
+
+	var (
+		// Generate a canonical chain to act as the main dataset
+		engine = ethash.NewFaker()
+		db     = rawdb.NewMemoryDatabase()
+		// A sender who makes transactions, has some funds
+		key, _  = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
+		address = crypto.PubkeyToAddress(key.PublicKey)
+		funds   = big.NewInt(0).SetUint64(math.MaxUint64)
+	)
+
+	initCode := []byte{byte(vm.PUSH1), byte(1),
+		byte(vm.SLOAD),
+		byte(vm.PUSH1), byte(50),
+		byte(vm.JUMPI),
+		byte(vm.PUSH1), byte(1),
+		byte(vm.PUSH1), byte(1),
+		byte(vm.SSTORE),
+		byte(vm.PUSH1), byte(10), // return
+		byte(vm.PUSH1), byte(10),
+		byte(vm.RETURN),
+	}
+	gspec := &Genesis{
+		Config: params.TestChainConfig,
+		Alloc: GenesisAlloc{
+			address: {Balance: funds},
+		},
+	}
+	genesis := gspec.MustCommit(db)
+	var nonce uint64
+
+	// Import the canonical chain
+	diskdb := rawdb.NewMemoryDatabase()
+	gspec.MustCommit(diskdb)
+	chain, err := NewBlockChain(diskdb, nil, params.TestChainConfig, engine, vm.Config{
+		//Debug:  true,
+		//Tracer: vm.NewJSONLogger(nil, os.Stdout),
+	}, nil, nil)
+	if err != nil {
+		t.Fatalf("failed to create tester chain: %v", err)
+	}
+	var txs []*types.Transaction
+	for i := 0; i < 1000; i++ {
+		tx, _ := types.SignNewTx(key, types.HomesteadSigner{}, &types.LegacyTx{
+			Nonce:    uint64(i),
+			GasPrice: big.NewInt(875000000),
+			Gas:      100000,
+			Data:     initCode,
+		})
+		txs = append(txs, tx)
+	}
+
+	var current *types.Block
+	current = genesis
+
+	chainA, _ := GenerateChain(params.TestChainConfig, current, engine, db, 100, func(i int, b *BlockGen) {
+		b.SetCoinbase(common.Address{0xa})
+		b.AddTx(txs[nonce+uint64(i)])
+	})
+	for i, block := range chainA[:len(chainA)] {
+		if err := chain.InsertBlockWithoutSetHead(block); err != nil {
+			t.Fatalf("block %d: failed to insert into chain: %v", i, err)
+		}
+		nonce++
+	}
+	head := len(chainA) - 1
+	if err := chain.SetChainHead(chainA[head]); err != nil {
+		t.Fatalf("block %d: failed set head: %v", head, err)
 	}
 }

@@ -21,6 +21,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"fmt"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
@@ -498,6 +499,7 @@ func (evm *EVM) create(caller ContractRef, codeAndHash *codeAndHash, gas uint64,
 // Create creates a new contract using code as deployment code.
 func (evm *EVM) Create(caller ContractRef, code []byte, gas uint64, value *big.Int) (ret []byte, contractAddr common.Address, leftOverGas uint64, err error) {
 	contractAddr = crypto.CreateAddress(caller.Address(), evm.StateDB.GetNonce(caller.Address()))
+	fmt.Printf("Create creating %#x\n", contractAddr)
 	return evm.create(caller, &codeAndHash{code: code}, gas, value, contractAddr, CREATE)
 }
 

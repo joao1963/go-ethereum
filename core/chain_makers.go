@@ -90,6 +90,8 @@ func (b *BlockGen) AddTx(tx *types.Transaction) {
 	b.AddTxWithChain(nil, tx)
 }
 
+var JOURNAL_REVERT_TEST = false
+
 // AddTxWithChain adds a transaction to the generated block. If no coinbase has
 // been set, the block's coinbase is set to the zero address.
 //

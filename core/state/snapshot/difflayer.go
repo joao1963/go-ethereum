@@ -204,6 +204,9 @@ func newDiffLayer(parent snapshot, root common.Hash, destructs map[common.Hash]s
 			dl.memory += uint64(common.HashLength + len(data))
 			snapshotDirtyStorageWriteMeter.Mark(int64(len(data)))
 		}
+		if _, ok := accounts[accountHash]; !ok {
+			panic(fmt.Sprintf("Dangling storage for %#x", accountHash))
+		}
 	}
 	dl.memory += uint64(len(destructs) * common.HashLength)
 	return dl
