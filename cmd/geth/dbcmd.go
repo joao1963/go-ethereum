@@ -745,6 +745,11 @@ func showMetaData(ctx *cli.Context) error {
 	stack, _ := makeConfigNode(ctx)
 	defer stack.Close()
 	db := utils.MakeChainDatabase(ctx, stack, true)
+
+	snapshot.LoadAndPrintJournal(db)
+	if true {
+		return nil
+	}
 	ancients, err := db.Ancients()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error accessing ancients: %v", err)
@@ -884,28 +889,38 @@ func dbBlockInfo(ctx *cli.Context) error {
 	db := utils.MakeChainDatabase(ctx, stack, true)
 	var p common.Hash
 	s := types.NewLondonSigner(big.NewInt(5))
-	for num := 6655223; num >= 6655173; num-- {
+	// head : 6655223
+	// last pivot: 6638962, 16261 blocks before head
+	for num := 6655223; num > 6655223-30000; num-- {
 		hashes := rawdb.ReadAllHashes(db, uint64(num))
 		for _, h := range hashes {
+			var orphan bool
 			head := rawdb.ReadHeader(db, h, uint64(num))
-			fmt.Printf("Block %d:", num)
-			fmt.Printf("- %#x, parent: %#x", h, head.ParentHash)
-
 			if p != h && p != (common.Hash{}) {
-				fmt.Printf("<-- side\n")
+				orphan = true
 			} else {
-				fmt.Println("")
+				p = head.ParentHash
+			}
+			info := fmt.Sprintf("Block %d: - %#x, parent: %#x, stateRoot: %#x, basefee %d [canon]\n",
+				num, h, head.ParentHash, head.Root, head.BaseFee)
+
+			if orphan {
+				info = fmt.Sprintf("Block %d: - %#x, parent: %#x, stateRoot: %#x, basefee %d [orphan]\n",
+					num, h, head.ParentHash, head.Root, head.BaseFee)
 			}
 
-			p = head.ParentHash
 			body := rawdb.ReadBody(db, h, uint64(num))
 			for _, tx := range body.Transactions {
-				from, err := s.Sender(tx)
+				from, _ := s.Sender(tx)
 				if from == common.HexToAddress("0x20e43cadc9961edfc61170eeef66d571c5993dfc") {
-					fmt.Printf("sender: %x %v\n", from, err)
+					fmt.Printf(info)
+					fmt.Printf("  sender: %#x nonce %d price %d %#v\n", from, tx.Nonce(), tx.GasPrice(), tx.Hash())
+				}
+				if from == common.HexToAddress("0x408b33def162c6e48dbb823cef9ba7a0181dc961") {
+					fmt.Printf(info)
+					fmt.Printf("  sender: %#x nonce %d price %d %#v\n", from, tx.Nonce(), tx.GasPrice(), tx.Hash())
 				}
 			}
-
 		}
 	}
 	return nil

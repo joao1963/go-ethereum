@@ -345,3 +345,98 @@ func (dl *diffLayer) Journal(buffer *bytes.Buffer) (common.Hash, error) {
 	log.Debug("Journalled diff layer", "root", dl.root, "parent", dl.parent.Root())
 	return base, nil
 }
+
+func LoadAndPrintJournal(db ethdb.KeyValueStore) error {
+	journal := rawdb.ReadSnapshotJournal(db)
+	if len(journal) == 0 {
+		log.Warn("Loaded snapshot journal", "diffs", "missing")
+		return nil
+	}
+	r := rlp.NewStream(bytes.NewReader(journal), 0)
+
+	// Firstly, resolve the first element as the journal version
+	version, err := r.Uint()
+	if err != nil {
+		log.Warn("Failed to resolve the journal version", "error", err)
+		return nil
+	}
+	fmt.Printf("Journal version: %d\n", version)
+	if version != journalVersion {
+		log.Warn("Discarded the snapshot journal with wrong version", "required", journalVersion, "got", version)
+		return nil
+	}
+	// Secondly, resolve the disk layer root, ensure it's continuous
+	// with disk layer. Note now we can ensure it's the snapshot journal
+	// correct version, so we expect everything can be resolved properly.
+	var root common.Hash
+	if err := r.Decode(&root); err != nil {
+		return errors.New("missing disk layer root")
+	}
+	// The diff journal is not matched with disk, discard them.
+	// It can happen that Geth crashes without persisting the latest
+	// diff journal.
+	fmt.Printf("Base root: %#x\n", root)
+	// Load all the snapshot diffs from the journal
+	return loadAndPrintDiffLayer(r)
+}
+
+// loadDiffLayer reads the next sections of a snapshot journal, reconstructing a new
+// diff and verifying that it can be linked to the requested parent.
+func loadAndPrintDiffLayer(r *rlp.Stream) error {
+	// Read the next diff journal entry
+	var root common.Hash
+	if err := r.Decode(&root); err != nil {
+		// The first read may fail with EOF, marking the end of the journal
+		if err == io.EOF {
+			return nil
+		}
+		return fmt.Errorf("load diff root: %v", err)
+	}
+	var destructs []journalDestruct
+	if err := r.Decode(&destructs); err != nil {
+		return fmt.Errorf("load diff destructs: %v", err)
+	}
+	destructSet := make(map[common.Hash]struct{})
+	for _, entry := range destructs {
+		destructSet[entry.Hash] = struct{}{}
+	}
+	var accounts []journalAccount
+	if err := r.Decode(&accounts); err != nil {
+		return fmt.Errorf("load diff accounts: %v", err)
+	}
+	accountData := make(map[common.Hash][]byte)
+	for _, entry := range accounts {
+		if len(entry.Blob) > 0 { // RLP loses nil-ness, but `[]byte{}` is not a valid item, so reinterpret that
+			accountData[entry.Hash] = entry.Blob
+		} else {
+			accountData[entry.Hash] = nil
+		}
+	}
+	var storage []journalStorage
+	if err := r.Decode(&storage); err != nil {
+		return fmt.Errorf("load diff storage: %v", err)
+	}
+	storageData := make(map[common.Hash]map[common.Hash][]byte)
+	for _, entry := range storage {
+		slots := make(map[common.Hash][]byte)
+		for i, key := range entry.Keys {
+			if len(entry.Vals[i]) > 0 { // RLP loses nil-ness, but `[]byte{}` is not a valid item, so reinterpret that
+				slots[key] = entry.Vals[i]
+			} else {
+				slots[key] = nil
+			}
+		}
+		storageData[entry.Hash] = slots
+	}
+	fmt.Printf("root: %#x\n", root)
+	fmt.Printf("  #destructs: %d\n", len(destructSet))
+	fmt.Printf("  #accounts: %d\n", len(accountData))
+	//for k, v := range accountData {
+	//	fmt.Printf("    %#x: %d\n", k, len(v))
+	//}
+	//fmt.Printf("  #storage: %d\n", len(storageData))
+	//for k, v := range storageData {
+	//	fmt.Printf("    %#x: %d\n", k, len(v))
+	//}
+	return loadAndPrintDiffLayer(r)
+}
