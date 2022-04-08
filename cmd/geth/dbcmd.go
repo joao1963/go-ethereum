@@ -41,6 +41,7 @@ import (
 	"github.com/ethereum/go-ethereum/trie"
 	"github.com/olekukonko/tablewriter"
 	"gopkg.in/urfave/cli.v1"
+	"math/big"
 )
 
 var (
@@ -74,6 +75,7 @@ Remove blockchain and state databases`,
 			dbExportCmd,
 			dbMetadataCmd,
 			dbMigrateFreezerCmd,
+			dbBlockInfoCmd,
 		},
 	}
 	dbInspectCmd = cli.Command{
@@ -269,6 +271,22 @@ WARNING: This is a low-level operation which may cause database corruption!`,
 		},
 		Description: `The freezer-migrate command checks your database for receipts in a legacy format and updates those.
 WARNING: please back-up the receipt files in your ancients before running this command.`,
+	}
+	dbBlockInfoCmd = cli.Command{
+		Action:    utils.MigrateFlags(dbBlockInfo),
+		Name:      "blockdump",
+		Usage:     "TODO",
+		ArgsUsage: "<hex-encoded storage trie root> <hex-encoded start (optional)> <int max elements (optional)>",
+		Flags: []cli.Flag{
+			utils.DataDirFlag,
+			utils.SyncModeFlag,
+			utils.MainnetFlag,
+			utils.RopstenFlag,
+			utils.SepoliaFlag,
+			utils.RinkebyFlag,
+			utils.GoerliFlag,
+		},
+		Description: "This command looks up the specified database key from the database.",
 	}
 )
 
@@ -856,4 +874,39 @@ func dbHasLegacyReceipts(db ethdb.Database, firstIdx uint64) (bool, uint64, erro
 	}
 	legacy, err = types.IsLegacyStoredReceipts(first)
 	return legacy, firstIdx, err
+}
+
+func dbBlockInfo(ctx *cli.Context) error {
+	var (
+		stack, _ = makeConfigNode(ctx)
+	)
+	defer stack.Close()
+	db := utils.MakeChainDatabase(ctx, stack, true)
+	var p common.Hash
+	s := types.NewLondonSigner(big.NewInt(5))
+	for num := 6655223; num >= 6655173; num-- {
+		hashes := rawdb.ReadAllHashes(db, uint64(num))
+		for _, h := range hashes {
+			head := rawdb.ReadHeader(db, h, uint64(num))
+			fmt.Printf("Block %d:", num)
+			fmt.Printf("- %#x, parent: %#x", h, head.ParentHash)
+
+			if p != h && p != (common.Hash{}) {
+				fmt.Printf("<-- side\n")
+			} else {
+				fmt.Println("")
+			}
+
+			p = head.ParentHash
+			body := rawdb.ReadBody(db, h, uint64(num))
+			for _, tx := range body.Transactions {
+				from, err := s.Sender(tx)
+				if from == common.HexToAddress("0x20e43cadc9961edfc61170eeef66d571c5993dfc") {
+					fmt.Printf("sender: %x %v\n", from, err)
+				}
+			}
+
+		}
+	}
+	return nil
 }
