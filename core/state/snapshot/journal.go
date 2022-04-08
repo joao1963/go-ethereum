@@ -427,6 +427,9 @@ func loadAndPrintDiffLayer(r *rlp.Stream) error {
 			}
 		}
 		storageData[entry.Hash] = slots
+		if _, ok := accountData[entry.Hash]; !ok {
+			fmt.Printf("Dangle: %x\n", entry.Hash)
+		}
 	}
 	fmt.Printf("root: %#x\n", root)
 	fmt.Printf("  #destructs: %d\n", len(destructSet))
