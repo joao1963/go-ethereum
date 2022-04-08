@@ -423,7 +423,7 @@ func loadAndPrintDiffLayer(r *rlp.Stream) error {
 			if len(entry.Vals[i]) > 0 { // RLP loses nil-ness, but `[]byte{}` is not a valid item, so reinterpret that
 				slots[key] = entry.Vals[i]
 				// 0x00000..02
-				if bytes.Equal(slots[key], common.Hex2Bytes("0x405787fa12a823e0f2b7631cc41b3ba8828b3321ca811111fa75cd3aa3bb5ace")) &&
+				if key == common.HexToHash("0x405787fa12a823e0f2b7631cc41b3ba8828b3321ca811111fa75cd3aa3bb5ace") &&
 					bytes.Equal(entry.Vals[i], common.Hex2Bytes("0x05")) {
 					fmt.Printf("root: %#x\n", root)
 					fmt.Printf("  account %d\n", entry.Hash)
