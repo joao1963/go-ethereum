@@ -350,11 +350,19 @@ func convertToVerkle(ctx *cli.Context) error {
 					values[slotkey[31]] = value[:]
 					continue
 				}
-				kvCh <- &group{laststem, values[:]}
+
+				// flush the previous group, iff it's not the header group
+				if !bytes.Equal(stem[:31], laststem[:]) {
+					kvCh <- &group{stem: laststem, values: values[:]}
+				}
+
+				values = make([][]byte, 256)
+				values[slotkey[31]] = value[:]
+				copy(laststem[:], slotkey[:31])
 			}
 
 			// commit the last group if it's not the header group
-			if !bytes.Equal(laststem[:31], stem) {
+			if !bytes.Equal(laststem[:31], stem[:31]) {
 				kvCh <- &group{laststem, values[:]}
 			}
 		}
@@ -541,6 +549,7 @@ func doInsertion(ctx *cli.Context) error {
 		if err := readDataDump(itemCh, abortCh); err != nil {
 			log.Error("Error reading data", "err", err)
 		}
+		close(itemCh)
 	}()
 	defer close(abortCh)
 
