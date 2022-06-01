@@ -563,6 +563,7 @@ func doInsertion(ctx *cli.Context) error {
 		flushCh <- node
 	}
 	go func() {
+		batch := convdb.NewBatch()
 		for node := range flushCh {
 			comm := node.ComputeCommitment()
 			s, err := node.Serialize()
@@ -570,10 +571,20 @@ func doInsertion(ctx *cli.Context) error {
 				panic(err)
 			}
 			commB := comm.Bytes()
-			if err := convdb.Put(commB[:], s); err != nil {
+			if err := batch.Put(commB[:], s); err != nil {
 				panic(err)
 			}
+			if batch.ValueSize() > 1024+1024 {
+				if err := batch.Write(); err != nil {
+					log.Crit("Failed to update chain indexes and markers", "err", err)
+				}
+				batch.Reset()
+			}
 		}
+		if err := batch.Write(); err != nil {
+			log.Crit("Failed to update chain indexes and markers", "err", err)
+		}
+
 	}()
 
 	for elem := range itemCh {
