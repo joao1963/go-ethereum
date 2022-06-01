@@ -483,7 +483,7 @@ func readDataDump(itemCh chan group, abortCh chan struct{}) error {
 		}
 	}()
 
-	for {
+	for items := 0; ; items++ {
 		smallest := -1
 		done := true
 		for i, _ := range indexFiles {
@@ -523,6 +523,9 @@ func readDataDump(itemCh chan group, abortCh chan struct{}) error {
 			return nil
 		default:
 			continue
+		}
+		if items > 1000000 {
+			break
 		}
 
 	}
