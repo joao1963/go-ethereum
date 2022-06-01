@@ -558,7 +558,7 @@ func doInsertion(ctx *cli.Context) error {
 		panic(err)
 	}
 
-	flushCh := make(chan verkle.VerkleNode)
+	flushCh := make(chan verkle.VerkleNode, 100)
 	saveverkle := func(node verkle.VerkleNode) {
 		flushCh <- node
 	}
