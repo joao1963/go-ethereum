@@ -533,6 +533,9 @@ func readDataDump(itemCh chan group, abortCh chan struct{}) error {
 }
 
 func doInsertion(ctx *cli.Context) error {
+	go func() {
+		fmt.Println(http.ListenAndServe("localhost:8080", nil))
+	}()
 
 	var (
 		start      = time.Now()
