@@ -28,6 +28,7 @@ import (
 	"syscall"
 	"time"
 
+	"bufio"
 	"github.com/ethereum/go-ethereum/cmd/utils"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -207,6 +208,16 @@ WARNING: This is a low-level operation which may cause database corruption!`,
 		}, utils.NetworkFlags, utils.DatabasePathFlags),
 		Description: `The freezer-migrate command checks your database for receipts in a legacy format and updates those.
 WARNING: please back-up the receipt files in your ancients before running this command.`,
+	}
+	dbPreimageExportCmd = cli.Command{
+		Action:    utils.MigrateFlags(exportPreimagedata),
+		Name:      "preimage-export",
+		Usage:     "Exports the preimages into a custom data format dump.",
+		ArgsUsage: "<dumpfile>",
+		Flags: utils.GroupFlags([]cli.Flag{
+			utils.SyncModeFlag,
+		}, utils.NetworkFlags, utils.DatabasePathFlags),
+		Description: "Exports the preimages.",
 	}
 )
 
@@ -839,4 +850,62 @@ func dbHasLegacyReceipts(db ethdb.Database, firstIdx uint64) (bool, uint64, erro
 	}
 	legacy, err = types.IsLegacyStoredReceipts(first)
 	return legacy, firstIdx, err
+}
+
+func exportPreimagedata(ctx *cli.Context) error {
+	if ctx.NArg() < 1 {
+		return fmt.Errorf("required arguments: %v", ctx.Command.ArgsUsage)
+	}
+	var (
+		stack, _  = makeConfigNode(ctx)
+		interrupt = make(chan os.Signal, 1)
+		stop      = make(chan struct{})
+	)
+	defer stack.Close()
+	signal.Notify(interrupt, syscall.SIGINT, syscall.SIGTERM)
+	defer signal.Stop(interrupt)
+	defer close(interrupt)
+	go func() {
+		if _, ok := <-interrupt; ok {
+			log.Info("Interrupted during db export, stopping at next batch")
+		}
+		close(stop)
+	}()
+
+	db := utils.MakeChainDatabase(ctx, stack, true)
+	defer db.Close()
+
+	var (
+		it        = rawdb.NewKeyLengthIterator(db.NewIterator(rawdb.PreimagePrefix, nil), len(rawdb.PreimagePrefix)+len(common.Hash{}))
+		count     int
+		startTime = time.Now()
+		lastLog   = time.Now()
+	)
+	fh, err := os.OpenFile(ctx.Args().First(), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, os.ModePerm)
+	if err != nil {
+		return err
+	}
+	out := bufio.NewWriter(fh)
+	defer func() {
+		out.Flush()
+		fh.Close()
+	}()
+	//var buf = make([]byte, 40)
+	for it.Next() {
+		// 8 byte + 32 byte => 40 byte per element
+		//copy(buf, it.Key()[len(rawdb.PreimagePrefix):])
+		//copy(buf[8:], it.Value())
+		//out.Write(buf)
+		out.Write(it.Key()[len(rawdb.PreimagePrefix) : len(rawdb.PreimagePrefix)+8])
+		out.Write(it.Value()[0:31])
+		count++
+		if time.Since(lastLog) > 8*time.Second {
+			lastLog = time.Now()
+			log.Info("Writing preimages", "at", fmt.Sprintf("%x"),
+				it.Key()[len(rawdb.PreimagePrefix):],
+				"count", count,
+				"elapsed", common.PrettyDuration(time.Since(startTime)))
+		}
+	}
+	return nil
 }
