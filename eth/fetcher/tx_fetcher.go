@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	mrand "math/rand"
+	"runtime"
 	"sort"
 	"time"
 
@@ -60,6 +61,10 @@ const (
 	// txGatherSlack is the interval used to collate almost-expired announces
 	// with network fetches.
 	txGatherSlack = 100 * time.Millisecond
+
+	// maxTxProcessingsPerSchedule is the maximum number of transactions that can be
+	// processed (added) before yielding to other goroutines
+	maxTxProcessingsPerSchedule = 256
 )
 
 var (
@@ -275,32 +280,46 @@ func (f *TxFetcher) Enqueue(peer string, txs []*types.Transaction, direct bool) 
 		duplicate   int64
 		underpriced int64
 		otherreject int64
+		batchTxs    []*types.Transaction
 	)
-	errs := f.addTxs(txs)
-	for i, err := range errs {
-		// Track the transaction hash if the price is too low for us.
-		// Avoid re-request this transaction when we receive another
-		// announcement.
-		if errors.Is(err, core.ErrUnderpriced) || errors.Is(err, core.ErrReplaceUnderpriced) {
-			for f.underpriced.Cardinality() >= maxTxUnderpricedSetSize {
-				f.underpriced.Pop()
+	for len(txs) > 0 {
+		if len(txs) > maxTxProcessingsPerSchedule {
+			batchTxs = txs[0:maxTxProcessingsPerSchedule]
+			txs = txs[maxTxProcessingsPerSchedule:]
+		} else {
+			batchTxs = txs
+			txs = nil
+		}
+		errs := f.addTxs(batchTxs)
+		for i, err := range errs {
+			// Track the transaction hash if the price is too low for us.
+			// Avoid re-request this transaction when we receive another
+			// announcement.
+			if errors.Is(err, core.ErrUnderpriced) || errors.Is(err, core.ErrReplaceUnderpriced) {
+				for f.underpriced.Cardinality() >= maxTxUnderpricedSetSize {
+					f.underpriced.Pop()
+				}
+				f.underpriced.Add(batchTxs[i].Hash())
 			}
-			f.underpriced.Add(txs[i].Hash())
+			// Track a few interesting failure types
+			switch {
+			case err == nil: // Noop, but need to handle to not count these
+
+			case errors.Is(err, core.ErrAlreadyKnown):
+				duplicate++
+
+			case errors.Is(err, core.ErrUnderpriced) || errors.Is(err, core.ErrReplaceUnderpriced):
+				underpriced++
+
+			default:
+				otherreject++
+			}
+			added = append(added, batchTxs[i].Hash())
+			if txs != nil {
+				log.Trace("TX processing yields to other goroutines", "remained", len(txs))
+				runtime.Gosched()
+			}
 		}
-		// Track a few interesting failure types
-		switch {
-		case err == nil: // Noop, but need to handle to not count these
-
-		case errors.Is(err, core.ErrAlreadyKnown):
-			duplicate++
-
-		case errors.Is(err, core.ErrUnderpriced) || errors.Is(err, core.ErrReplaceUnderpriced):
-			underpriced++
-
-		default:
-			otherreject++
-		}
-		added = append(added, txs[i].Hash())
 	}
 	if direct {
 		txReplyKnownMeter.Mark(duplicate)
