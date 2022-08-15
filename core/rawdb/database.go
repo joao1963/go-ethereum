@@ -18,7 +18,6 @@ package rawdb
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"os"
 	"path"
