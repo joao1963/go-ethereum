@@ -127,7 +127,7 @@ func NewFreezer(datadir string, namespace string, readonly bool, maxTableSize ui
 	if freezer.readonly {
 		// In readonly mode only validate, don't truncate.
 		// validate also sets `freezer.frozen`.
-		err = freezer.validate()
+		//err = freezer.validate()
 	} else {
 		// Truncate all tables to common length.
 		err = freezer.repair()
