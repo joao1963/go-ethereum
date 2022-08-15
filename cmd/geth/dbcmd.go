@@ -62,6 +62,7 @@ Remove blockchain and state databases`,
 			dbStatCmd,
 			dbCompactCmd,
 			dbGetCmd,
+			dbCheckCmd,
 			dbDeleteCmd,
 			dbPutCmd,
 			dbGetSlotsCmd,
@@ -113,6 +114,16 @@ a data corruption.`,
 		Description: `This command performs a database compaction. 
 WARNING: This operation may take a very long time to finish, and may cause database
 corruption if it is aborted during execution'!`,
+	}
+	dbCheckCmd = &cli.Command{
+		Action:    dbCheckPreimages,
+		Name:      "check-preimages",
+		Usage:     "Show the value of a database key",
+		ArgsUsage: "<hex-encoded key>",
+		Flags: flags.Merge([]cli.Flag{
+			utils.SyncModeFlag,
+		}, utils.NetworkFlags, utils.DatabasePathFlags),
+		Description: "This command looks up the specified database key from the database.",
 	}
 	dbGetCmd = &cli.Command{
 		Action:    dbGet,
@@ -394,6 +405,36 @@ func dbCompact(ctx *cli.Context) error {
 	}
 	log.Info("Stats after compaction")
 	showLeveldbStats(db)
+	return nil
+}
+
+// dbGet shows the value of a given database key
+func dbCheckPreimages(ctx *cli.Context) error {
+	stack, _ := makeConfigNode(ctx)
+	defer stack.Close()
+
+	db := utils.MakeChainDatabase(ctx, stack, true)
+	defer db.Close()
+
+	// Iterate over the preimages and export them
+	it := db.NewIterator([]byte("secure-key-"), nil)
+	defer it.Release()
+
+	var num20 uint64
+	var num32 uint64
+	var total uint64
+	for it.Next() {
+		v := it.Value()
+		if bytes.Equal(v[:12], []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}) {
+			num20++
+		} else {
+			num32++
+		}
+		total++
+		if total%100_000 == 0 {
+			log.Info("Iterating", "at", it.Key(), "num20", num20, "num32", num32, "total", total)
+		}
+	}
 	return nil
 }
 
