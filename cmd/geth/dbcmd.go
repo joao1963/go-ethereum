@@ -431,8 +431,8 @@ func dbCheckPreimages(ctx *cli.Context) error {
 			num32++
 		}
 		total++
-		if total%100_000 == 0 {
-			log.Info("Iterating", "at", it.Key(), "num20", num20, "num32", num32, "total", total)
+		if total%1_000_000 == 0 {
+			log.Info("Iterating", "at", fmt.Sprintf("%#x", it.Key()), "num20", num20, "num32", num32, "total", total)
 		}
 	}
 	return nil
