@@ -294,7 +294,7 @@ func (f *TxFetcher) Enqueue(peer string, txs []*types.Transaction, direct bool) 
 			underpriced int64
 			otherreject int64
 
-			_a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n int64
+			_a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o int64
 		)
 		batch := txs[i:end]
 		for j, err := range f.addTxs(batch) {
@@ -347,6 +347,8 @@ func (f *TxFetcher) Enqueue(peer string, txs []*types.Transaction, direct bool) 
 					_m++
 				case errors.Is(err, core.ErrTxPoolOverflow):
 					_n++
+				default:
+					_o++
 				}
 				otherreject++
 			}
