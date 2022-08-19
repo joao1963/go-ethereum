@@ -293,6 +293,8 @@ func (f *TxFetcher) Enqueue(peer string, txs []*types.Transaction, direct bool) 
 			duplicate   int64
 			underpriced int64
 			otherreject int64
+
+			_a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n int64
 		)
 		batch := txs[i:end]
 		for j, err := range f.addTxs(batch) {
@@ -316,6 +318,36 @@ func (f *TxFetcher) Enqueue(peer string, txs []*types.Transaction, direct bool) 
 				underpriced++
 
 			default:
+				switch {
+				case errors.Is(err, core.ErrTxTypeNotSupported):
+					_a++
+				case errors.Is(err, core.ErrOversizedData):
+					_b++
+				case errors.Is(err, core.ErrNegativeValue):
+					_c++
+				case errors.Is(err, core.ErrGasLimit):
+					_d++
+				case errors.Is(err, core.ErrFeeCapVeryHigh):
+					_e++
+				case errors.Is(err, core.ErrTipVeryHigh):
+					_f++
+				case errors.Is(err, core.ErrTipAboveFeeCap):
+					_g++
+				case errors.Is(err, core.ErrTipVeryHigh):
+					_h++
+				case errors.Is(err, core.ErrInvalidSender):
+					_i++
+				case errors.Is(err, core.ErrNonceTooLow):
+					_j++
+				case errors.Is(err, core.ErrInsufficientFunds):
+					_k++
+				case errors.Is(err, core.ErrIntrinsicGas):
+					_l++
+				case errors.Is(err, core.ErrGasUintOverflow):
+					_m++
+				case errors.Is(err, core.ErrTxPoolOverflow):
+					_n++
+				}
 				otherreject++
 			}
 			added = append(added, batch[j].Hash())
@@ -328,7 +360,22 @@ func (f *TxFetcher) Enqueue(peer string, txs []*types.Transaction, direct bool) 
 		// out of sync with the chain or the peer is griefing us.
 		if otherreject > 128/4 {
 			delay = 200 * time.Millisecond
-			log.Warn("Peer delivering useless transactions", "peer", peer, "ignored", len(txs)-end)
+			log.Warn("Peer delivering useless transactions", "peer", peer, "ignored", len(txs)-end,
+				"a", _a,
+				"b", _b,
+				"c", _c,
+				"d", _d,
+				"e", _e,
+				"f", _f,
+				"g", _g,
+				"h", _h,
+				"i", _i,
+				"j", _j,
+				"k", _k,
+				"l", _l,
+				"m", _m,
+				"n", _n,
+			)
 			break
 		}
 	}
