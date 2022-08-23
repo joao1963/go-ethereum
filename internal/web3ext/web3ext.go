@@ -595,6 +595,12 @@ web3._extend({
 			call: 'eth_getLogs',
 			params: 1,
 		}),
+		new web3._extend.Method({
+			name: 'getCodeHash',
+			call: 'eth_getCodeHash',
+			params: 2,
+			inputFormatter: [web3._extend.formatters.inputAddressFormatter, web3._extend.formatters.inputBlockNumberFormatter],
+		}),
 	],
 	properties: [
 		new web3._extend.Property({

@@ -818,6 +818,16 @@ func (s *BlockChainAPI) GetCode(ctx context.Context, address common.Address, blo
 	return code, state.Error()
 }
 
+// GetCodeHash returns the codehash stored at the given address in the state for the given block number.
+func (s *BlockChainAPI) GetCodeHash(ctx context.Context, address common.Address, blockNrOrHash rpc.BlockNumberOrHash) (common.Hash, error) {
+	state, _, err := s.b.StateAndHeaderByNumberOrHash(ctx, blockNrOrHash)
+	if state == nil || err != nil {
+		return common.Hash{}, err
+	}
+	hash := state.GetCodeHash(address)
+	return hash, state.Error()
+}
+
 // GetStorageAt returns the storage from the state at the given address, key and
 // block number. The rpc.LatestBlockNumber and rpc.PendingBlockNumber meta block
 // numbers are also allowed.
