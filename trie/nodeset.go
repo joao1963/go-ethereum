@@ -19,6 +19,7 @@ package trie
 import (
 	"fmt"
 	"reflect"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 )
@@ -148,6 +149,28 @@ func (set *NodeSet) Hashes() []common.Hash {
 		ret = append(ret, node.hash)
 	}
 	return ret
+}
+
+func (set *NodeSet) Summary() string {
+	var out = new(strings.Builder)
+	fmt.Fprintf(out, "nodeset owner: %v\n", set.owner)
+	if set.updates != nil {
+		for _, key := range set.updates.order {
+			updated := set.updates.nodes[key]
+			if updated.prev != nil {
+				fmt.Fprintf(out, "  [*]: %x -> %v prev: %x\n", key, updated.hash, updated.prev)
+			} else {
+				fmt.Fprintf(out, "  [+]: %x -> %v\n", key, updated.hash)
+			}
+		}
+	}
+	for k, n := range set.deletes {
+		fmt.Fprintf(out, "  [-]: %x -> %x\n", k, n)
+	}
+	for _, n := range set.leaves {
+		fmt.Fprintf(out, "[leaf]: %v\n", n)
+	}
+	return out.String()
 }
 
 // MergedNodeSet represents a merged dirty node set for a group of tries.

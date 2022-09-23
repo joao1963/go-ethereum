@@ -356,7 +356,7 @@ func TestRandomCases(t *testing.T) {
 		{op: 1, key: common.Hex2Bytes("980c393656413a15c8da01978ed9f89feb80b502f58f2d640e3a2f5f7a99a7018f1b573befd92053ac6f78fca4a87268"), value: common.Hex2Bytes("")}, // step 24
 		{op: 1, key: common.Hex2Bytes("fd"), value: common.Hex2Bytes("")},                                                                                               // step 25
 	}
-	runRandTest(rt)
+	runRandTestSteps(rt)
 }
 
 // randTest performs random trie operations.
@@ -412,7 +412,137 @@ func (randTest) Generate(r *rand.Rand, size int) reflect.Value {
 	return reflect.ValueOf(steps)
 }
 
-func runRandTest(rt randTest) bool {
+type dataSource struct {
+	input  []byte
+	reader *bytes.Reader
+}
+
+func newDataSource(input []byte) *dataSource {
+	return &dataSource{
+		input, bytes.NewReader(input),
+	}
+}
+func (ds *dataSource) readByte() byte {
+	if b, err := ds.reader.ReadByte(); err != nil {
+		return 0
+	} else {
+		return b
+	}
+}
+func (ds *dataSource) Read(buf []byte) (int, error) {
+	return ds.reader.Read(buf)
+}
+func (ds *dataSource) Ended() bool {
+	return ds.reader.Len() == 0
+}
+
+func FuzzTrieOperations(f *testing.F) {
+
+	f.Fuzz(func(t *testing.T, data []byte) {
+		r := newDataSource(data)
+		gen := &randomStepsGenerator{
+			source: r,
+		}
+		if !runRandTest(gen) {
+			t.Fatal(gen.getError())
+			//panic(gen.getError())
+		}
+	})
+
+}
+
+// randomSteps is the interface through which we can provide steps for fuzzing.
+type randomSteps interface {
+	setError(int, error)
+	next() (bool, int, randTestStep)
+	hasError(int) bool
+	getError() error
+}
+
+// randomStepsList implements randomSteps using a pre-generated list of steps.
+type randomStepsList struct {
+	index int
+	rt    []randTestStep
+}
+
+func (l *randomStepsList) setError(i int, err error) {
+	l.rt[i].err = err
+}
+func (l *randomStepsList) hasError(i int) bool {
+	return l.rt[i].err != nil
+}
+
+func (l *randomStepsList) getError() error {
+	for _, step := range l.rt {
+		if step.err != nil {
+			return step.err
+		}
+	}
+	return nil
+}
+
+func (l *randomStepsList) next() (bool, int, randTestStep) {
+	if idx := l.index; idx < len(l.rt) {
+		l.index++
+		return true, idx, l.rt[idx]
+	}
+	return false, 0, randTestStep{}
+}
+
+func runRandTestSteps(rt randTest) bool {
+	return runRandTest(&randomStepsList{0, rt})
+}
+
+// randomStepsGenerator implements randomSteps using on-the-fly generated steps.
+type randomStepsGenerator struct {
+	source  *dataSource
+	index   int
+	allKeys [][]byte
+	err     error
+}
+
+func (gen *randomStepsGenerator) setError(i int, err error) {
+	gen.err = fmt.Errorf("step %d: %w", i, err)
+}
+func (gen *randomStepsGenerator) hasError(i int) bool {
+	return gen.err != nil
+}
+func (gen *randomStepsGenerator) getError() error {
+	return gen.err
+}
+
+func (gen *randomStepsGenerator) genKey() []byte {
+	if len(gen.allKeys) < 2 || gen.source.readByte() < 0x0f {
+		// new key
+		key := make([]byte, gen.source.readByte()%50)
+		gen.source.Read(key)
+		gen.allKeys = append(gen.allKeys, key)
+		return key
+	}
+	// use existing key
+	return gen.allKeys[int(gen.source.readByte())%len(gen.allKeys)]
+
+}
+
+func (gen *randomStepsGenerator) next() (bool, int, randTestStep) {
+	if gen.source.Ended() {
+		return false, 0, randTestStep{}
+	}
+	step := randTestStep{op: int(gen.source.readByte() % byte(opMax))}
+	i := gen.index
+	gen.index++
+	switch step.op {
+	case opUpdate:
+		step.key = gen.genKey()
+		step.value = make([]byte, 8)
+		binary.BigEndian.PutUint64(step.value, uint64(i))
+	case opGet, opDelete:
+		step.key = gen.genKey()
+	}
+	return true, i, step
+}
+
+func runRandTest(rt randomSteps) bool {
 	var (
 		triedb   = NewDatabase(memorydb.New())
 		tr       = NewEmpty(triedb)
@@ -421,9 +551,12 @@ func runRandTest(rt randTest) bool {
 	)
 	tr.tracer = newTracer()
 
-	for i, step := range rt {
+	for {
+		ok, i, step := rt.next()
+		if !ok {
+			break
+		}
 		// fmt.Printf("{op: %d, key: common.Hex2Bytes(\"%x\"), value: common.Hex2Bytes(\"%x\")}, // step %d\n",
-		// 	step.op, step.key, step.value, i)
 
 		switch step.op {
 		case opUpdate:
@@ -436,7 +569,7 @@ func runRandTest(rt randTest) bool {
 			v := tr.Get(step.key)
 			want := values[string(step.key)]
 			if string(v) != want {
-				rt[i].err = fmt.Errorf("mismatch for key %#x, got %#x want %#x", step.key, v, want)
+				rt.setError(i, fmt.Errorf("mismatch for key %#x, got %#x want %#x", step.key, v, want))
 			}
 		case opProve:
 			hash := tr.Hash()
@@ -457,7 +590,7 @@ func runRandTest(rt randTest) bool {
 		case opCommit:
 			root, nodes, err := tr.Commit(true)
 			if err != nil {
-				rt[i].err = err
+				rt.setError(i, err)
 				return false
 			}
 			// Validity the returned nodeset
@@ -466,15 +599,17 @@ func runRandTest(rt randTest) bool {
 					blob, _, _ := origTrie.TryGetNode(hexToCompact([]byte(path)))
 					got := node.prev
 					if !bytes.Equal(blob, got) {
-						rt[i].err = fmt.Errorf("prevalue mismatch for 0x%x, got 0x%x want 0x%x", path, got, blob)
-						panic(rt[i].err)
+						err := fmt.Errorf("prevalue mismatch for 0x%x, got 0x%x want 0x%x", path, got, blob)
+						rt.setError(i, err)
+						panic(err)
 						return false
 					}
 				}
 				for path, prev := range nodes.deletes {
 					blob, _, _ := origTrie.TryGetNode(hexToCompact([]byte(path)))
 					if !bytes.Equal(blob, prev) {
-						rt[i].err = fmt.Errorf("prevalue mismatch for 0x%x, got 0x%x want 0x%x", path, prev, blob)
+						err = fmt.Errorf("prevalue mismatch for 0x%x, got 0x%x want 0x%x", path, prev, blob)
+						rt.setError(i, err)
 						return false
 					}
 				}
@@ -484,7 +619,7 @@ func runRandTest(rt randTest) bool {
 			}
 			newtr, err := New(TrieID(root), triedb)
 			if err != nil {
-				rt[i].err = err
+				rt.setError(i, err)
 				return false
 			}
 			tr = newtr
@@ -502,7 +637,7 @@ func runRandTest(rt randTest) bool {
 				checktr.Update(it.Key, it.Value)
 			}
 			if tr.Hash() != checktr.Hash() {
-				rt[i].err = fmt.Errorf("hash mismatch in opItercheckhash")
+				rt.setError(i, fmt.Errorf("hash mismatch in opItercheckhash"))
 			}
 		case opNodeDiff:
 			var (
@@ -542,24 +677,25 @@ func runRandTest(rt randTest) bool {
 				}
 			}
 			if len(insertExp) != len(inserted) {
-				rt[i].err = fmt.Errorf("insert set mismatch")
+				rt.setError(i, fmt.Errorf("insert set mismatch"))
+
 			}
 			if len(deleteExp) != len(deleted) {
-				rt[i].err = fmt.Errorf("delete set mismatch")
+				rt.setError(i, fmt.Errorf("delete set mismatch"))
 			}
 			for _, insert := range inserted {
 				if _, present := insertExp[string(insert)]; !present {
-					rt[i].err = fmt.Errorf("missing inserted node")
+					rt.setError(i, fmt.Errorf("missing inserted node"))
 				}
 			}
 			for _, del := range deleted {
 				if _, present := deleteExp[string(del)]; !present {
-					rt[i].err = fmt.Errorf("missing deleted node")
+					rt.setError(i, fmt.Errorf("missing deleted node"))
 				}
 			}
 		}
 		// Abort the test on error.
-		if rt[i].err != nil {
+		if rt.hasError(i) {
 			return false
 		}
 	}
@@ -567,7 +703,7 @@ func runRandTest(rt randTest) bool {
 }
 
 func TestRandom(t *testing.T) {
-	if err := quick.Check(runRandTest, nil); err != nil {
+	if err := quick.Check(runRandTestSteps, nil); err != nil {
 		if cerr, ok := err.(*quick.CheckError); ok {
 			t.Fatalf("random test iteration %d failed: %s", cerr.Count, spew.Sdump(cerr.In))
 		}
@@ -1166,4 +1302,59 @@ func TestDecodeNode(t *testing.T) {
 		rand.Read(elems)
 		decodeNode(hash, elems)
 	}
+}
+
+func TestDelete2(t *testing.T) {
+	triedb := NewDatabase(rawdb.NewMemoryDatabase())
+	tr := NewEmpty(triedb)
+	tr.tracer = newTracer()
+	vals := []struct{ k, v string }{
+		{"do", "verb"},
+		{"ether", "wookiedoo"},
+		{"horse", "stallion"},
+		{"shaman", "horse"},
+		{"doge", "coin"},
+		{"dog", "puppy"},
+		{"somethingveryoddindeedthis is", "myothernodedata"},
+	}
+	for _, val := range vals {
+		updateString(tr, val.k, val.v)
+	}
+	root1, nodes, err := tr.Commit(false)
+	fmt.Println(nodes.Summary())
+	if err != nil {
+		t.Fatalf("commit error: %v", err)
+	}
+	fmt.Printf("root 1: %x\n", root1)
+	triedb.Update(NewWithNodeSet(nodes))
+
+	// create a new trie on top of the database.
+	trie2, err := New(root1, common.Hash{}, root1, triedb)
+	trie2.tracer = newTracer()
+	if err != nil {
+		t.Fatalf("can't recreate trie at %x: %v", root1, err)
+	}
+	// Make a modification
+	updateString(trie2, "doggie", "blahonga")
+
+	root2, nodes, err := trie2.Commit(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Printf("root 2: %x\n", root2)
+	fmt.Println(nodes.Summary())
+	triedb.Update(NewWithNodeSet(nodes))
+	// Load up the new trie
+	trie3, err := New(root2, common.Hash{}, root2, triedb)
+	trie3.tracer = newTracer()
+	if err != nil {
+		t.Fatalf("can't recreate trie at %x: %v", root2, err)
+	}
+	deleteString(trie3, "doggie")
+	root3, nodes, err := trie3.Commit(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Printf("root 3: %x\n", root3)
+	fmt.Println(nodes.Summary())
 }
