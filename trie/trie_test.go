@@ -579,11 +579,11 @@ func runRandTest(rt randomSteps) bool {
 			proofDb := rawdb.NewMemoryDatabase()
 			err := tr.Prove(step.key, 0, proofDb)
 			if err != nil {
-				rt[i].err = fmt.Errorf("failed for proving key %#x, %v", step.key, err)
+				rt.setError(i, fmt.Errorf("failed for proving key %#x, %v", step.key, err))
 			}
 			_, err = VerifyProof(hash, step.key, proofDb)
 			if err != nil {
-				rt[i].err = fmt.Errorf("failed for verifying key %#x, %v", step.key, err)
+				rt.setError(i, fmt.Errorf("failed for verifying key %#x, %v", step.key, err))
 			}
 		case opHash:
 			tr.Hash()
@@ -1329,7 +1329,7 @@ func TestDelete2(t *testing.T) {
 	triedb.Update(NewWithNodeSet(nodes))
 
 	// create a new trie on top of the database.
-	trie2, err := New(root1, common.Hash{}, root1, triedb)
+	trie2, err := New(TrieID(root1), triedb)
 	trie2.tracer = newTracer()
 	if err != nil {
 		t.Fatalf("can't recreate trie at %x: %v", root1, err)
@@ -1345,7 +1345,7 @@ func TestDelete2(t *testing.T) {
 	fmt.Println(nodes.Summary())
 	triedb.Update(NewWithNodeSet(nodes))
 	// Load up the new trie
-	trie3, err := New(root2, common.Hash{}, root2, triedb)
+	trie3, err := New(TrieID(root2), triedb)
 	trie3.tracer = newTracer()
 	if err != nil {
 		t.Fatalf("can't recreate trie at %x: %v", root2, err)
