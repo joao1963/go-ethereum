@@ -38,6 +38,17 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 )
 
+type API interface {
+	// ForkchoiceUpdatedV1 informs the EL about the most recent head.
+	ForkchoiceUpdatedV1(update beacon.ForkchoiceStateV1, payloadAttributes *beacon.PayloadAttributesV1) (beacon.ForkChoiceResponse, error)
+	// ExchangeTransitionConfigurationV1 checks the given configuration against the configuration of the node.
+	ExchangeTransitionConfigurationV1(config beacon.TransitionConfigurationV1) (*beacon.TransitionConfigurationV1, error)
+	// GetPayloadV1 returns a cached payload by id.
+	GetPayloadV1(payloadID beacon.PayloadID) (*beacon.ExecutableDataV1, error)
+	// NewPayloadV1 creates an Eth1 block, inserts it in the chain, and returns the status of the chain.
+	NewPayloadV1(params beacon.ExecutableDataV1) (beacon.PayloadStatusV1, error)
+}
+
 // Register adds the engine API to the full node.
 func Register(stack *node.Node, backend *eth.Ethereum) error {
 	log.Warn("Engine API enabled", "protocol", "eth")
@@ -125,7 +136,7 @@ type ConsensusAPI struct {
 
 // NewConsensusAPI creates a new consensus api for the given backend.
 // The underlying blockchain needs to have a valid terminal total difficulty set.
-func NewConsensusAPI(eth *eth.Ethereum) *ConsensusAPI {
+func NewConsensusAPI(eth *eth.Ethereum) API {
 	if eth.BlockChain().Config().TerminalTotalDifficulty == nil {
 		log.Warn("Engine API started but chain not configured for merge yet")
 	}
