@@ -33,6 +33,7 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/urfave/cli/v2"
 	"net"
+	"net/http"
 )
 
 var (
@@ -107,6 +108,10 @@ type relayPI struct {
 }
 
 func newRelayPI() (*relayPI, error) {
+	newRemoteEL("http://bench01.ethdevops.io:8545", "bench01", "the jwt secret", nil)
+	newRemoteEL("http://bench02.ethdevops.io:8545", "bench01", "the jwt secret", nil)
+	newRemoteEL("http://bench03.ethdevops.io:8545", "bench01", "the jwt secret", nil)
+	newRemoteEL("http://bench04.ethdevops.io:8545", "bench01", "the jwt secret", nil)
 	// TODO soup up some TOML to configure the ELs
 	return &relayPI{}, nil
 }
@@ -114,7 +119,9 @@ func newRelayPI() (*relayPI, error) {
 func (r *relayPI) ForkchoiceUpdatedV1(update beacon.ForkchoiceStateV1, payloadAttributes *beacon.PayloadAttributesV1) (beacon.ForkChoiceResponse, error) {
 	for _, el := range r.els[1:] {
 		go func(el catalyst.API) {
-			el.ForkchoiceUpdatedV1(update, payloadAttributes)
+			if _, err := el.ForkchoiceUpdatedV1(update, payloadAttributes); err != nil {
+				log.Info("Remote call error", "method", "FCUV1", "err", err)
+			}
 		}(el)
 	}
 	return r.els[0].ForkchoiceUpdatedV1(update, payloadAttributes)
@@ -123,7 +130,10 @@ func (r *relayPI) ForkchoiceUpdatedV1(update beacon.ForkchoiceStateV1, payloadAt
 func (r *relayPI) ExchangeTransitionConfigurationV1(config beacon.TransitionConfigurationV1) (*beacon.TransitionConfigurationV1, error) {
 	for _, el := range r.els[1:] {
 		go func(el catalyst.API) {
-			el.ExchangeTransitionConfigurationV1(config)
+			if _, err := el.ExchangeTransitionConfigurationV1(config); err != nil {
+				log.Info("Remote call error", "method", "ETCV1", "err", err)
+			}
+
 		}(el)
 	}
 	return r.els[0].ExchangeTransitionConfigurationV1(config)
@@ -136,7 +146,9 @@ func (r *relayPI) GetPayloadV1(payloadID beacon.PayloadID) (*beacon.ExecutableDa
 func (r *relayPI) NewPayloadV1(params beacon.ExecutableDataV1) (beacon.PayloadStatusV1, error) {
 	for _, el := range r.els[1:] {
 		go func(el catalyst.API) {
-			el.NewPayloadV1(params)
+			if _, err := el.NewPayloadV1(params); err != nil {
+				log.Info("Remote call error", "method", "NPV1", "err", err)
+			}
 		}(el)
 	}
 	return r.els[0].NewPayloadV1(params)
@@ -144,9 +156,15 @@ func (r *relayPI) NewPayloadV1(params beacon.ExecutableDataV1) (beacon.PayloadSt
 
 // remoteEL represents a remote Execution Layer client.
 type remoteEL struct {
-	addr      net.Addr
-	cli       rpc.Client
-	jwtSecret string
+	addr          net.Addr
+	cli           rpc.Client
+	jwtSecret     string
+	customHeaders http.Header
+}
+
+func newRemoteEL(addr, name, jwtSecret string, customHeaders http.Header) (*remoteEL, error) {
+	return &remoteEL{}, nil
+	// 	r.cli.SetHeader()
 }
 
 func (r *remoteEL) ForkchoiceUpdatedV1(update beacon.ForkchoiceStateV1, payloadAttributes *beacon.PayloadAttributesV1) (beacon.ForkChoiceResponse, error) {
@@ -182,7 +200,7 @@ func (r *remoteEL) GetPayloadV1(payloadID beacon.PayloadID) (*beacon.ExecutableD
 func (r *remoteEL) NewPayloadV1(params beacon.ExecutableDataV1) (beacon.PayloadStatusV1, error) {
 	var raw json.RawMessage
 	var resp beacon.PayloadStatusV1
-	err := r.cli.CallContext(context.Background(), &raw, "engine_exchangeTransitionConfigurationV1", params)
+	err := r.cli.CallContext(context.Background(), &raw, "engine_newPayloadV1", params)
 	if err != nil {
 		return resp, err
 	}
