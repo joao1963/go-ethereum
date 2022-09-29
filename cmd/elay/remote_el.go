@@ -1,10 +1,10 @@
 package main
 
 import (
-	"encoding/json"
-	"time"
 	"context"
+	"encoding/json"
 	"errors"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/beacon"
@@ -13,7 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 )
 
-const errBackoffCount = 1
+const errBackoffCount = 10
 const backOffPeriod = time.Minute
 
 // remoteEL represents a remote Execution Layer client.
