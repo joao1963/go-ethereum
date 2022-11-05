@@ -399,23 +399,23 @@ func TestTypeCheck(t *testing.T) {
 			t.Fatal("unexpected parse error:", err)
 		} else if err != nil && len(test.err) != 0 {
 			if err.Error() != test.err {
-				t.Errorf("%d failed. Expected err: '%v' got err: '%v'", i, test.err, err)
+				t.Errorf("test %d: '%v' failed \n want err: '%v'\n have err: '%v'", i, test.typ, test.err, err)
 			}
 			continue
 		}
 
 		err = typeCheck(typ, reflect.ValueOf(test.input))
 		if err != nil && len(test.err) == 0 {
-			t.Errorf("%d failed. Expected no err but got: %v", i, err)
+			t.Errorf("test %d: '%v' failed - want no err but got: %v", i, test.typ, err)
 			continue
 		}
 		if err == nil && len(test.err) != 0 {
-			t.Errorf("%d failed. Expected err: %v but got none", i, test.err)
+			t.Errorf("test %d: '%v' failed - want err %v but got none", i, test.typ, test.err)
 			continue
 		}
 
 		if err != nil && len(test.err) != 0 && err.Error() != test.err {
-			t.Errorf("%d failed. Expected err: '%v' got err: '%v'", i, test.err, err)
+			t.Errorf("test %d: '%v' failed \n want err: '%v'\n have err: '%v'", i, test.typ, test.err, err)
 		}
 	}
 }

@@ -70,6 +70,14 @@ var (
 	typeRegex = regexp.MustCompile("([a-zA-Z]+)(([0-9]+)(x([0-9]+))?)?")
 )
 
+func numericType(t string) bool {
+	switch t {
+	case "int", "uint", "fixed", "ufixed":
+		return true
+	}
+	return false
+}
+
 // NewType creates a new reflection type of abi type given in t.
 func NewType(t string, internalType string, components []ArgumentMarshaling) (typ Type, err error) {
 	// check that array brackets are equal if they exist
@@ -95,28 +103,27 @@ func NewType(t string, internalType string, components []ArgumentMarshaling) (ty
 		// grab the last cell and create a type from there
 		sliced := t[i:]
 		// grab the slice size with regexp
-		re := regexp.MustCompile(`^\[([0-9]*)\]$`)
-		intz := re.FindAllStringSubmatch(sliced, -1)
 
-		if len(intz) == 1 {
-			if len(intz[0][1]) == 0 {
-				// is a slice
-				typ.T = SliceTy
-				typ.Elem = &embeddedType
-				typ.stringKind = embeddedType.stringKind + sliced
-			} else {
-				// is an array
-				typ.T = ArrayTy
-				typ.Elem = &embeddedType
-				typ.Size, err = strconv.Atoi(intz[0][1])
-				if err != nil {
-					return Type{}, fmt.Errorf("abi: error parsing array size: %v", err)
-				}
-				if strconv.Itoa(typ.Size) != intz[0][1] {
-					return Type{}, fmt.Errorf("abi: wrong array size: %s", intz[0][1])
-				}
-				typ.stringKind = embeddedType.stringKind + sliced
+		re := regexp.MustCompile("[0-9]+")
+		intz := re.FindAllString(sliced, -1)
+
+		if len(intz) == 0 {
+			// is a slice
+			typ.T = SliceTy
+			typ.Elem = &embeddedType
+			typ.stringKind = embeddedType.stringKind + sliced
+		} else if len(intz) == 1 {
+			// is an array
+			typ.T = ArrayTy
+			typ.Elem = &embeddedType
+			typ.Size, err = strconv.Atoi(intz[0])
+			if err != nil {
+				return Type{}, fmt.Errorf("abi: error parsing array size: %v", err)
 			}
+			if strconv.Itoa(typ.Size) != intz[0] {
+				return Type{}, fmt.Errorf("abi: wrong array size: %s", intz[0])
+			}
+			typ.stringKind = embeddedType.stringKind + sliced
 		} else {
 			return Type{}, fmt.Errorf("invalid formatting of array type")
 		}
@@ -131,9 +138,10 @@ func NewType(t string, internalType string, components []ArgumentMarshaling) (ty
 
 	// varSize is the size of the variable
 	var varSize int
-	numericTypes := map[string]bool{"int": true, "uint": true, "fixed": true, "ufixed": true}
 	if len(parsedType[3]) > 0 {
-		if !numericTypes[parsedType[1]] && parsedType[1] != "bytes" {
+		switch parsedType[1] {
+		case "int", "uint", "fixed", "ufixed", "bytes":
+		default:
 			return Type{}, fmt.Errorf("only int, uint, fixed, ufixed, bytes types can have variable size specified: %s", t)
 		}
 		var err error
@@ -154,7 +162,7 @@ func NewType(t string, internalType string, components []ArgumentMarshaling) (ty
 			return Type{}, fmt.Errorf("abi: wrong variable size: %s", parsedType[3])
 		}
 	} else {
-		if numericTypes[parsedType[0]] {
+		if numericType(parsedType[0]) {
 			// this should fail because it means that there's something wrong with
 			// the abi type (the compiler should always format it to the size...always)
 			return Type{}, fmt.Errorf("unsupported arg type: %s", t)
