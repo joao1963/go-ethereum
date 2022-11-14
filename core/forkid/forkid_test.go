@@ -229,6 +229,8 @@ func TestCreation(t *testing.T) {
 			if have := NewID(tt.config, tt.genesis, ttt.head, ttt.time); have != ttt.want {
 				t.Errorf("test %d, case %d: fork ID mismatch: have %x, want %x", i, j, have, ttt.want)
 			}
+			// Test that NewStaticFilter doesn't crash
+			NewStaticFilter(tt.config, tt.genesis)
 		}
 	}
 }

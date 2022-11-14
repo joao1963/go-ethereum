@@ -126,13 +126,11 @@ func NewStaticFilter(config *params.ChainConfig, genesis common.Hash) Filter {
 // newFilter is the internal version of NewFilter, taking closures as its arguments
 // instead of a chain. The reason is to allow testing it without having to simulate
 // an entire blockchain.
+// Calculate the all the valid fork hash and fork next combos
 func newFilter(config *params.ChainConfig, genesis common.Hash, headfn func() uint64) Filter {
-	// Calculate the all the valid fork hash and fork next combos
-	var (
-		forks, forksByTime = gatherForks(config)
-		sums               = make([][4]byte, len(forks)+1) // 0th is the genesis
-	)
+	forks, forksByTime := gatherForks(config)
 	forks = append(forks, forksByTime...)
+	sums := make([][4]byte, len(forks)+1) // 0th is the genesis
 	hash := crc32.ChecksumIEEE(genesis[:])
 	sums[0] = checksumToBytes(hash)
 	for i, fork := range forks {
