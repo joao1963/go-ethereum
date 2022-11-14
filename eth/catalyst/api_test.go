@@ -998,7 +998,7 @@ func TestSimultaneousNewBlock(t *testing.T) {
 // includes zero withdrawals and the second includes two.
 func TestWithdrawals(t *testing.T) {
 	genesis, blocks := generateMergeChain(10, true)
-	genesis.Config.ShanghaiTime = big.NewInt(11)
+	genesis.Config.ShanghaiBlock = big.NewInt(11)
 	genesis.Config.TerminalTotalDifficulty.Sub(genesis.Config.TerminalTotalDifficulty, blocks[0].Difficulty())
 
 	n, ethservice := startEthService(t, genesis, blocks)

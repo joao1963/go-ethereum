@@ -35,7 +35,7 @@ func TestCreation(t *testing.T) {
 
 	withdrawalConfig := *params.MainnetChainConfig
 	withdrawalConfig.MergeNetsplitBlock = big.NewInt(18000000)
-	withdrawalConfig.ShanghaiTime = big.NewInt(1668000000)
+	withdrawalConfig.ShanghaiBlock = big.NewInt(1668000000)
 	type testcase struct {
 		head uint64
 		time uint64
