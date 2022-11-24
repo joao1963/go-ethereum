@@ -858,18 +858,28 @@ func (s *BlockChainAPI) GetStorageAt(ctx context.Context, address common.Address
 	return res[:], state.Error()
 }
 
+type Account struct {
+	Balance  *hexutil.Big   `json:"balance"`
+	CodeHash common.Hash    `json:"codeHash"`
+	Nonce    hexutil.Uint64 `json:"nonce"`
+	Root     common.Hash    `json:"root"`
+}
+
 // GetAccount returns whether an account object from the state for the given block number.
-func (s *BlockChainAPI) GetAccount(ctx context.Context, address common.Address, blockNrOrHash rpc.BlockNumberOrHash) (*types.StateAccount, error) {
+func (s *BlockChainAPI) GetAccount(ctx context.Context, address common.Address, blockNrOrHash rpc.BlockNumberOrHash) (*Account, error) {
 	state, _, err := s.b.StateAndHeaderByNumberOrHash(ctx, blockNrOrHash)
 	if state == nil || err != nil {
 		return nil, err
 	}
-
-	return &types.StateAccount{
-		Nonce:    state.GetNonce(address),
-		Balance:  state.GetBalance(address),
-		Root:     state.GetRoot(address),
-		CodeHash: state.GetCodeHash(address).Bytes(),
+	if !state.Exist(address) {
+		return nil, nil
+	}
+	obj := state.GetOrNewStateObject(address)
+	return &Account{
+		Balance:  (*hexutil.Big)(obj.Balance()),
+		CodeHash: common.BytesToHash(obj.CodeHash()),
+		Nonce:    (hexutil.Uint64)(obj.Nonce()),
+		Root:     obj.Root(),
 	}, state.Error()
 }
 
