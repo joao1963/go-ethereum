@@ -29,18 +29,12 @@ import (
 
 // precompiledTest defines the input/output pairs for precompiled contract tests.
 type precompiledTest struct {
-	Input, Expected string
-	Gas             uint64
-	Name            string
-	NoBenchmark     bool // Benchmark primarily the worst-cases
-}
-
-// precompiledFailureTest defines the input/error pairs for precompiled
-// contract failure tests.
-type precompiledFailureTest struct {
 	Input         string
+	Expected      string
 	ExpectedError string
+	Gas           uint64
 	Name          string
+	NoBenchmark   bool // Benchmark primarily the worst-cases
 }
 
 // allPrecompiles does not map to the actual set of precompiles, as it also contains
@@ -70,7 +64,7 @@ var allPrecompiles = map[common.Address]PrecompiledContract{
 }
 
 // EIP-152 test vectors
-var blake2FMalformedInputTests = []precompiledFailureTest{
+var blake2FMalformedInputTests = []precompiledTest{
 	{
 		Input:         "",
 		ExpectedError: errBlake2FInvalidInputLength.Error(),
@@ -132,7 +126,7 @@ func testPrecompiledOOG(addr string, test precompiledTest, t *testing.T) {
 	})
 }
 
-func testPrecompiledFailure(addr string, test precompiledFailureTest, t *testing.T) {
+func testPrecompiledFailure(addr string, test precompiledTest, t *testing.T) {
 	p := allPrecompiles[common.HexToAddress(addr)]
 	in := common.FromHex(test.Input)
 	gas := p.RequiredGas(in)
@@ -182,9 +176,13 @@ func benchmarkPrecompiled(addr string, test precompiledTest, bench *testing.B) {
 		mgasps := (100 * 1000 * gasUsed) / elapsed
 		bench.ReportMetric(float64(mgasps)/100, "mgas/s")
 		//Check if it is correct
-		if err != nil {
-			//bench.Error(err)
-			//return
+		if err != nil && len(test.ExpectedError) == 0 {
+			bench.Error(err)
+			return
+		}
+		if err == nil && len(test.ExpectedError) != 0 {
+			bench.Errorf("expected error: %v", test.ExpectedError)
+			return
 		}
 		if common.Bytes2Hex(res) != test.Expected {
 			bench.Errorf("Expected %v, got %v", test.Expected, common.Bytes2Hex(res))
@@ -345,12 +343,12 @@ func loadJson(name string) ([]precompiledTest, error) {
 	return testcases, err
 }
 
-func loadJsonFail(name string) ([]precompiledFailureTest, error) {
+func loadJsonFail(name string) ([]precompiledTest, error) {
 	data, err := os.ReadFile(fmt.Sprintf("testdata/precompiles/fail-%v.json", name))
 	if err != nil {
 		return nil, err
 	}
-	var testcases []precompiledFailureTest
+	var testcases []precompiledTest
 	err = json.Unmarshal(data, &testcases)
 	return testcases, err
 }
