@@ -421,6 +421,12 @@ func (evm *EVM) create(caller ContractRef, codeAndHash *codeAndHash, gas uint64,
 	if !evm.Context.CanTransfer(evm.StateDB, caller.Address(), value) {
 		return nil, common.Address{}, gas, ErrInsufficientBalance
 	}
+	// TODO:
+	//if evm.chainRules.IsShanghai && len(codeAndHash.code) > params.MaxInitCodeSize {
+	if evm.Config.HasEip3860() && len(codeAndHash.code) > params.MaxInitCodeSize {
+		// Check whether the init code size has been exceeded.
+		return nil, address, gas, ErrMaxInitCodeSizeExceeded
+	}
 	nonce := evm.StateDB.GetNonce(caller.Address())
 	if nonce+1 < nonce {
 		return nil, common.Address{}, gas, ErrNonceUintOverflow

@@ -308,8 +308,17 @@ func gasCreateEip3860(evm *EVM, contract *Contract, stack *Stack, mem *Memory, m
 		return 0, err
 	}
 	size, overflow := stack.Back(2).Uint64WithOverflow()
-	if overflow || size > params.MaxInitCodeSize {
+	if overflow {
 		return 0, ErrGasUintOverflow
+	}
+	if size > params.MaxInitCodeSize {
+		// For the CREATE and CREATE2 instructions charge an extra gas cost
+		// equaling to initcode_cost(initcode).
+		// This cost is deducted before the calculation of the resulting contract
+		// address and the execution of initcode.
+		//
+		// If the instruction fails due to the initcode length check of point 3, this cost is not deducted.
+		return gas, nil
 	}
 	// Since size <= params.MaxInitCodeSize, these multiplication cannot overflow
 	moreGas := params.InitCodeWordGas * ((size + 31) / 32)
@@ -325,8 +334,17 @@ func gasCreate2Eip3860(evm *EVM, contract *Contract, stack *Stack, mem *Memory, 
 		return 0, err
 	}
 	size, overflow := stack.Back(2).Uint64WithOverflow()
-	if overflow || size > params.MaxInitCodeSize {
+	if overflow {
 		return 0, ErrGasUintOverflow
+	}
+	if size > params.MaxInitCodeSize {
+		// For the CREATE and CREATE2 instructions charge an extra gas cost
+		// equaling to initcode_cost(initcode).
+		// This cost is deducted before the calculation of the resulting contract
+		// address and the execution of initcode.
+		//
+		// If the instruction fails due to the initcode length check of point 3, this cost is not deducted.
+		return gas, nil
 	}
 	// Since size <= params.MaxInitCodeSize, these multiplication cannot overflow
 	moreGas := (params.InitCodeWordGas + params.Keccak256WordGas) * ((size + 31) / 32)
