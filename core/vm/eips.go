@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"sort"
 
+	"encoding/binary"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/holiman/uint256"
@@ -337,7 +338,7 @@ func opRjumpv(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]b
 func opCallf(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
 	var (
 		code = scope.Contract.CodeAt(scope.CodeSection)
-		idx  = parseUint16(code[*pc+1:])
+		idx  = binary.BigEndian.Uint16(code[*pc+1:])
 		typ  = scope.Contract.Container.Types[scope.CodeSection]
 	)
 	if scope.Stack.len()+int(typ.MaxStackHeight) >= 1024 {
@@ -371,7 +372,7 @@ func opRetf(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byt
 func opJumpf(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
 	var (
 		code = scope.Contract.CodeAt(scope.CodeSection)
-		idx  = parseUint16(code[*pc+1:])
+		idx  = binary.BigEndian.Uint16(code[*pc+1:])
 	)
 	scope.CodeSection = uint64(idx)
 	*pc = 0

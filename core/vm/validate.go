@@ -78,7 +78,7 @@ func validateCode(code []byte, section int, metadata []*FunctionMetadata, jt *Ju
 			if i+2 >= len(code) {
 				return fmt.Errorf("truncated operand")
 			}
-			arg := parseUint16(code[i+1:])
+			arg, _ := parseUint16(code[i+1:])
 			if arg >= len(metadata) {
 				return fmt.Errorf("code section out-of-bounds (want: %d, have: %d)", arg, len(metadata))
 			}
@@ -152,7 +152,7 @@ func validateControlFlow(code []byte, section int, metadata []*FunctionMetadata,
 
 			switch {
 			case op == CALLF:
-				arg := parseUint16(code[pos+1:])
+				arg, _ := parseUint16(code[pos+1:])
 				if metadata[arg].Input < uint8(height) {
 					return 0, 0, fmt.Errorf("stack underflow")
 				}
@@ -160,16 +160,16 @@ func validateControlFlow(code []byte, section int, metadata []*FunctionMetadata,
 					return 0, 0, fmt.Errorf("stack overflow")
 				}
 			case op == RJUMP:
-				arg := parseUint16(code[pos+1:])
+				arg, _ := parseUint16(code[pos+1:])
 				pos += 3 + arg
 			case op == RJUMPI:
-				arg := parseUint16(code[pos+1:])
+				arg, _ := parseUint16(code[pos+1:])
 				worklist = append(worklist, item{pos: pos + 3 + arg, height: height})
 				pos += 3
 			case op == RJUMPV:
 				count := int(code[pos+1])
 				for i := 0; i < count; i++ {
-					arg := parseUint16(code[pos+2+2*i:])
+					arg, _ := parseUint16(code[pos+2+2*i:])
 					worklist = append(worklist, item{pos: pos + arg, height: height})
 				}
 				pos += 2 + 2*count
