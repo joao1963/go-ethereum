@@ -118,6 +118,17 @@ last block to write. In this mode, the file will be appended
 if already existing. If the file ends with .gz, the output will
 be gzipped.`,
 	}
+	exportHistoryCommand = &cli.Command{
+		Action:    exportHistory,
+		Name:      "export-history",
+		Usage:     "Export blockchain history to Era archives",
+		ArgsUsage: "<dir> <first> <last> <step>",
+		Flags:     flags.Merge(utils.DatabasePathFlags),
+		Description: `
+The export-history command will export blocks and their corresponding receipts
+into Era archives. Eras are typically packaged in steps of 8192 blocks.
+`,
+	}
 	importPreimagesCommand = &cli.Command{
 		Action:    importPreimages,
 		Name:      "import-preimages",
@@ -355,6 +366,39 @@ func exportChain(ctx *cli.Context) error {
 		err = utils.ExportAppendChain(chain, fp, uint64(first), uint64(last))
 	}
 
+	if err != nil {
+		utils.Fatalf("Export error: %v\n", err)
+	}
+	fmt.Printf("Export done in %v\n", time.Since(start))
+	return nil
+}
+
+// exportHistory exports chain history in Era archives at a specified
+// directory.
+func exportHistory(ctx *cli.Context) error {
+	if ctx.Args().Len() != 3 {
+		utils.Fatalf("This command requires an argument.")
+	}
+
+	stack, _ := makeConfigNode(ctx)
+	defer stack.Close()
+
+	chain, _ := utils.MakeChain(ctx, stack, true)
+	start := time.Now()
+
+	first, ferr := strconv.ParseInt(ctx.Args().Get(1), 10, 64)
+	last, lerr := strconv.ParseInt(ctx.Args().Get(2), 10, 64)
+	step, serr := strconv.ParseInt(ctx.Args().Get(3), 10, 64)
+	if ferr != nil || lerr != nil || serr != nil {
+		utils.Fatalf("Export error in parsing parameters: block number or step not an integer\n")
+	}
+	if first < 0 || last < 0 || step < 0 {
+		utils.Fatalf("Export error: block number and step must be greater than 0\n")
+	}
+	if head := chain.CurrentFastBlock(); uint64(last) > head.NumberU64() {
+		utils.Fatalf("Export error: block number %d larger than head block %d\n", uint64(last), head.NumberU64())
+	}
+	err := utils.ExportHistory(chain, ctx.Args().First(), uint64(first), uint64(last), uint64(step))
 	if err != nil {
 		utils.Fatalf("Export error: %v\n", err)
 	}

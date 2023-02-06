@@ -25,6 +25,7 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"path"
 	"runtime"
 	"strings"
 	"syscall"
@@ -38,8 +39,10 @@ import (
 	"github.com/ethereum/go-ethereum/eth/ethconfig"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/internal/debug"
+	"github.com/ethereum/go-ethereum/internal/era"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/node"
+	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/urfave/cli/v2"
 )
@@ -284,6 +287,54 @@ func ExportAppendChain(blockchain *core.BlockChain, fn string, first uint64, las
 		return err
 	}
 	log.Info("Exported blockchain to", "file", fn)
+	return nil
+}
+
+func ExportHistory(bc *core.BlockChain, dir string, first, last, step uint64) error {
+	log.Info("Exporting blockchain history", "dir", dir)
+	if head := bc.CurrentBlock().NumberU64(); head < last {
+		log.Warn("Last block beyond head, setting last = head", "head", head, "last", last)
+		last = head
+	}
+	network := "unknown"
+	if name, ok := params.NetworkNames[bc.Config().ChainID.String()]; ok {
+		network = name
+	}
+	for i := uint64(0); i < last; i += step {
+		// Open file for Era.
+		fn := path.Join(dir, fmt.Sprintf("%s-%05d.era", network, i/step))
+		fh, err := os.OpenFile(fn, os.O_CREATE|os.O_APPEND|os.O_WRONLY, os.ModePerm)
+		if err != nil {
+			return err
+		}
+		defer fh.Close()
+
+		// Cap last step to available blocks.
+		if last < i+step {
+			step = last - i
+		}
+
+		w := era.NewBuilder(fh)
+		for j := uint64(0); j < step; j++ {
+			nr := i + j
+			block := bc.GetBlockByNumber(nr)
+			if block == nil {
+				return fmt.Errorf("export failed on #%d: not found", nr)
+			}
+			receipts := bc.GetReceiptsByHash(block.Hash())
+			if receipts == nil {
+				return fmt.Errorf("export failed on #%d: receipts not found", nr)
+			}
+			if err := w.Add(block, receipts); err != nil {
+				return err
+			}
+		}
+		if err := w.Finalize(); err != nil {
+			return fmt.Errorf("export failed to finalize %s: %w", fn, err)
+		}
+		log.Info("Exported blockchain to", "dir", dir, "fn", fn)
+	}
+
 	return nil
 }
 
