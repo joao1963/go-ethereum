@@ -300,40 +300,54 @@ func ExportHistory(bc *core.BlockChain, dir string, first, last, step uint64) er
 	if name, ok := params.NetworkNames[bc.Config().ChainID.String()]; ok {
 		network = name
 	}
+	var (
+		start    = time.Now()
+		reported = time.Now()
+	)
 	for i := uint64(0); i < last; i += step {
-		// Open file for Era.
-		fn := path.Join(dir, fmt.Sprintf("%s-%05d.era", network, i/step))
-		fh, err := os.OpenFile(fn, os.O_CREATE|os.O_APPEND|os.O_WRONLY, os.ModePerm)
-		if err != nil {
-			return err
-		}
-		defer fh.Close()
-
-		// Cap last step to available blocks.
-		if last < i+step {
-			step = last - i
-		}
-
-		w := era.NewBuilder(fh)
-		for j := uint64(0); j < step; j++ {
-			nr := i + j
-			block := bc.GetBlockByNumber(nr)
-			if block == nil {
-				return fmt.Errorf("export failed on #%d: not found", nr)
-			}
-			receipts := bc.GetReceiptsByHash(block.Hash())
-			if receipts == nil {
-				return fmt.Errorf("export failed on #%d: receipts not found", nr)
-			}
-			if err := w.Add(block, receipts); err != nil {
+		gen := func() error {
+			// Open file for Era.
+			fn := path.Join(dir, fmt.Sprintf("%s-%05d.era", network, i/step))
+			fh, err := os.OpenFile(fn, os.O_CREATE|os.O_APPEND|os.O_WRONLY, os.ModePerm)
+			if err != nil {
 				return err
 			}
+			defer fh.Close()
+
+			// Cap last step to available blocks.
+			if last < i+step {
+				step = last - i
+			}
+
+			w := era.NewBuilder(fh)
+			for j := uint64(0); j < step; j++ {
+				nr := i + j
+				block := bc.GetBlockByNumber(nr)
+				if block == nil {
+					return fmt.Errorf("export failed on #%d: not found", nr)
+				}
+				receipts := bc.GetReceiptsByHash(block.Hash())
+				if receipts == nil {
+					return fmt.Errorf("export failed on #%d: receipts not found", nr)
+				}
+				if err := w.Add(block, receipts); err != nil {
+					return err
+				}
+			}
+			if err := w.Finalize(); err != nil {
+				return fmt.Errorf("export failed to finalize %s: %w", fn, err)
+			}
+			if time.Since(reported) >= 10*time.Second {
+				log.Info("Exporting blocks", "exported", i, "elapsed", common.PrettyDuration(time.Since(start)))
+				reported = time.Now()
+			}
+			return nil
 		}
-		if err := w.Finalize(); err != nil {
-			return fmt.Errorf("export failed to finalize %s: %w", fn, err)
+		if err := gen(); err != nil {
+			return err
 		}
-		log.Info("Exported blockchain to", "dir", dir, "fn", fn)
 	}
+	log.Info("Exported blockchain to", "dir", dir)
 
 	return nil
 }
