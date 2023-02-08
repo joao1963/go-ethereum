@@ -36,8 +36,8 @@ import (
 )
 
 var (
-	count uint64 = 32
-	step  uint64 = 4
+	count uint64 = 128
+	step  uint64 = 16
 )
 
 func TestHistoryExporter(t *testing.T) {
@@ -96,8 +96,7 @@ func TestHistoryExporter(t *testing.T) {
 
 	// Verify each Era.
 	for i := 0; i < int(count/step); i++ {
-		fn := fmt.Sprintf("mainnet-%05d.era", i)
-		f, err := os.Open(path.Join(dir, fn))
+		f, err := os.Open(path.Join(dir, fmt.Sprintf("mainnet-%05d.era", i)))
 		if err != nil {
 			t.Fatalf("error opening era file: %v", err)
 		}
@@ -107,18 +106,20 @@ func TestHistoryExporter(t *testing.T) {
 			if err == io.EOF {
 				break
 			} else if err != nil {
-				t.Fatalf("error reading era file %s: %v", fn, err)
+				t.Fatalf("error reading era file %d: %v", i, err)
 			}
-			want := chain.GetBlockByNumber(uint64(i + j))
-			if want, got := uint64(i+j), b.NumberU64(); want != got {
+			var (
+				num  = i*int(step) + j
+				want = chain.GetBlockByNumber(uint64(num))
+			)
+			if want, got := uint64(num), b.NumberU64(); want != got {
 				t.Fatalf("blocks out of order: want %d, got %d", want, got)
 			}
 			if want.Hash() != b.Hash() {
 				t.Fatalf("block hash mistmatch %d: want %s, got %s", i+j, want.Hash().Hex(), b.Hash().Hex())
 			}
-			rh := types.DeriveSha(r, trie.NewStackTrie(nil))
-			if rh != want.ReceiptHash() {
-				t.Fatalf("receipt root %d mismatch: want %s, got %s", i+j, want.ReceiptHash(), rh)
+			if got := types.DeriveSha(r, trie.NewStackTrie(nil)); got != want.ReceiptHash() {
+				t.Fatalf("receipt root %d mismatch: want %s, got %s", i+j, want.ReceiptHash(), got)
 			}
 		}
 	}
