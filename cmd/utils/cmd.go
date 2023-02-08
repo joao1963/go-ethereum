@@ -337,7 +337,7 @@ func ExportHistory(bc *core.BlockChain, dir string, first, last, step uint64) er
 			if err := w.Finalize(); err != nil {
 				return fmt.Errorf("export failed to finalize %s: %w", fn, err)
 			}
-			if time.Since(reported) >= 10*time.Second {
+			if time.Since(reported) >= 8*time.Second {
 				log.Info("Exporting blocks", "exported", i, "elapsed", common.PrettyDuration(time.Since(start)))
 				reported = time.Now()
 			}
