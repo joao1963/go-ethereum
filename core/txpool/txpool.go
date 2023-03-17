@@ -719,7 +719,7 @@ func (pool *TxPool) isExecutable(from common.Address, tx *types.Transaction) boo
 		return pool.pendingNonces.get(from) == tx.Nonce()
 	}
 	// Does parent nonce exist in pending?
-	return list.txs.Get(tx.Nonce()-1) == nil
+	return list.txs.Get(tx.Nonce()-1) != nil
 	// Replacements are handled later
 }
 
@@ -752,7 +752,6 @@ func (pool *TxPool) addPending(tx *types.Transaction, local bool) (added, replac
 
 	// already validated by this point
 	from, _ := types.Sender(pool.signer, tx)
-
 	if !pool.isExecutable(from, tx) {
 		return false, false, nil
 	}
@@ -795,6 +794,7 @@ func (pool *TxPool) addPending(tx *types.Transaction, local bool) (added, replac
 		}
 	}
 	replaced = false
+
 	// Try to replace an existing transaction in the pending pool
 	if list := pool.pending[from]; list != nil && list.Contains(tx.Nonce()) {
 		// Nonce already pending, check if required price bump is met
@@ -813,6 +813,7 @@ func (pool *TxPool) addPending(tx *types.Transaction, local bool) (added, replac
 	}
 	pool.all.Add(tx, isLocal)
 	pool.priced.Put(tx, isLocal)
+	pool.promoteTx(from, tx.Hash(), tx)
 	pool.journalTx(from, tx)
 	pool.queueTxEvent(tx)
 	log.Trace("Pooled new executable transaction", "hash", hash, "from", from, "to", tx.To())
@@ -1153,11 +1154,12 @@ func (pool *TxPool) scheduleReorgLoop() {
 		// Launch next background reorg if needed
 		if curDone == nil && launchNextRun {
 			// Run the background reorg and announcements
-			go func() {
-				pool.runReorg(nextDone, reset, dirtyAccounts, queuedEvents)
+			go func(done chan struct{}) {
+				pool.runReorg(done, reset, dirtyAccounts, queuedEvents)
 				// don't reorg too often
 				time.Sleep(500 * time.Millisecond)
-			}()
+				close(done)
+			}(nextDone)
 
 			// Prepare everything for the next round of reorg
 			curDone, nextDone = nextDone, make(chan struct{})
@@ -1216,7 +1218,6 @@ func (pool *TxPool) runReorg(done chan struct{}, reset *txpoolResetRequest, dirt
 	defer func(t0 time.Time) {
 		reorgDurationTimer.Update(time.Since(t0))
 	}(time.Now())
-	defer close(done)
 
 	//var promoteAddrs []common.Address
 	//if dirtyAccounts != nil && reset == nil {
