@@ -40,6 +40,7 @@ import (
 	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/trie"
+	"github.com/lightclient/era"
 	"github.com/urfave/cli/v2"
 )
 
@@ -388,17 +389,16 @@ func exportHistory(ctx *cli.Context) error {
 
 	first, ferr := strconv.ParseInt(ctx.Args().Get(1), 10, 64)
 	last, lerr := strconv.ParseInt(ctx.Args().Get(2), 10, 64)
-	step, serr := strconv.ParseInt(ctx.Args().Get(3), 10, 64)
-	if ferr != nil || lerr != nil || serr != nil {
+	if ferr != nil || lerr != nil {
 		utils.Fatalf("Export error in parsing parameters: block number or step not an integer\n")
 	}
-	if first < 0 || last < 0 || step < 0 {
+	if first < 0 || last < 0 {
 		utils.Fatalf("Export error: block number and step must be greater than 0\n")
 	}
 	if head := chain.CurrentFastBlock(); uint64(last) > head.NumberU64() {
 		utils.Fatalf("Export error: block number %d larger than head block %d\n", uint64(last), head.NumberU64())
 	}
-	err := utils.ExportHistory(chain, ctx.Args().First(), uint64(first), uint64(last), uint64(step))
+	err := utils.ExportHistory(chain, ctx.Args().First(), uint64(first), uint64(last), uint64(era.MaxEraBatchSize))
 	if err != nil {
 		utils.Fatalf("Export error: %v\n", err)
 	}

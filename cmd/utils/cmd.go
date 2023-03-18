@@ -23,6 +23,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math/big"
 	"os"
 	"os/signal"
 	"path"
@@ -296,6 +297,9 @@ func ExportHistory(bc *core.BlockChain, dir string, first, last, step uint64) er
 		log.Warn("Last block beyond head, setting last = head", "head", head, "last", last)
 		last = head
 	}
+	if err := os.MkdirAll(dir, os.ModePerm); err != nil {
+		return fmt.Errorf("error creating directory: %w", err)
+	}
 	network := "unknown"
 	if name, ok := params.NetworkNames[bc.Config().ChainID.String()]; ok {
 		network = name
@@ -304,33 +308,53 @@ func ExportHistory(bc *core.BlockChain, dir string, first, last, step uint64) er
 		start    = time.Now()
 		reported = time.Now()
 	)
-	for i := uint64(0); i < last; i += step {
+	for i := uint64(first); i < last; i += step {
 		gen := func() error {
 			// Open file for Era.
 			fn := path.Join(dir, fmt.Sprintf("%s-%05d.era", network, i/step))
-			fh, err := os.OpenFile(fn, os.O_CREATE|os.O_APPEND|os.O_WRONLY, os.ModePerm)
+			fh, err := os.OpenFile(fn, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, os.ModePerm)
 			if err != nil {
 				return err
 			}
 			defer fh.Close()
 
 			// Cap last step to available blocks.
-			if last < i+step {
+			if last < i+step-1 {
 				step = last - i
 			}
 
-			w := era.NewBuilder(fh)
+			// Starting td for Era must be the td before the first
+			// block is applied. At genesis, td is 0 before genesis
+			// block.
+			startTd := big.NewInt(0)
+			if i != 0 {
+				b := bc.GetBlockByNumber(i - 1)
+				startTd.Set(bc.GetTd(b.Hash(), i-1))
+			}
+			w := era.NewBuilder(fh, i, startTd)
 			for j := uint64(0); j < step; j++ {
 				nr := i + j
-				block := bc.GetBlockByNumber(nr)
-				if block == nil {
+				b := bc.GetBlockByNumber(nr)
+				if b == nil {
 					return fmt.Errorf("export failed on #%d: not found", nr)
 				}
-				receipts := bc.GetReceiptsByHash(block.Hash())
-				if receipts == nil {
+				block, err := rlp.EncodeToBytes(b)
+				if err != nil {
+					return fmt.Errorf("encode block failed #%d: %w", nr, err)
+				}
+				r := bc.GetReceiptsByHash(b.Hash())
+				if r == nil {
 					return fmt.Errorf("export failed on #%d: receipts not found", nr)
 				}
-				if err := w.Add(block, receipts); err != nil {
+				receipts, err := rlp.EncodeToBytes(r)
+				if err != nil {
+					return fmt.Errorf("encode receipts failed #%d: %w", nr, err)
+				}
+				var (
+					hash = b.Hash().Bytes()[:]
+					td   = bc.GetTd(b.Hash(), nr)
+				)
+				if err := w.Add(block, receipts, hash, td); err != nil {
 					return err
 				}
 			}

@@ -31,6 +31,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/trie"
 	"github.com/lightclient/era"
 )
@@ -108,19 +109,37 @@ func TestHistoryExporter(t *testing.T) {
 			} else if err != nil {
 				t.Fatalf("error reading era file %d: %v", i, err)
 			}
+			block, receipts, err := decodeBlockAndReceipts(b, r)
+			if err != nil {
+				t.Fatalf("error decoding block or receipts: %v", err)
+			}
 			var (
 				num  = i*int(step) + j
 				want = chain.GetBlockByNumber(uint64(num))
 			)
-			if want, got := uint64(num), b.NumberU64(); want != got {
+			if want, got := uint64(num), block.Number().Uint64(); want != got {
 				t.Fatalf("blocks out of order: want %d, got %d", want, got)
 			}
-			if want.Hash() != b.Hash() {
-				t.Fatalf("block hash mistmatch %d: want %s, got %s", i+j, want.Hash().Hex(), b.Hash().Hex())
+			if want.Hash() != block.Hash() {
+				t.Fatalf("block hash mistmatch %d: want %s, got %s", i+j, want.Hash().Hex(), block.Hash().Hex())
 			}
-			if got := types.DeriveSha(r, trie.NewStackTrie(nil)); got != want.ReceiptHash() {
+			if got := types.DeriveSha(receipts, trie.NewStackTrie(nil)); got != want.ReceiptHash() {
 				t.Fatalf("receipt root %d mismatch: want %s, got %s", i+j, want.ReceiptHash(), got)
 			}
 		}
 	}
+}
+
+func decodeBlockAndReceipts(block, receipts []byte) (*types.Block, types.Receipts, error) {
+	var (
+		b types.Block
+		r types.Receipts
+	)
+	if err := rlp.DecodeBytes(block, &b); err != nil {
+		return nil, nil, err
+	}
+	if err := rlp.DecodeBytes(receipts, &r); err != nil {
+		return nil, nil, err
+	}
+	return &b, r, nil
 }
