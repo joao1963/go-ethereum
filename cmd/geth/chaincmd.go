@@ -395,8 +395,8 @@ func exportHistory(ctx *cli.Context) error {
 	if first < 0 || last < 0 {
 		utils.Fatalf("Export error: block number and step must be greater than 0\n")
 	}
-	if head := chain.CurrentFastBlock(); uint64(last) > head.NumberU64() {
-		utils.Fatalf("Export error: block number %d larger than head block %d\n", uint64(last), head.NumberU64())
+	if head := chain.CurrentBlock(); uint64(last) > head.Number.Uint64() {
+		utils.Fatalf("Export error: block number %d larger than head block %d\n", uint64(last), head.Number.Uint64())
 	}
 	err := utils.ExportHistory(chain, ctx.Args().First(), uint64(first), uint64(last), uint64(era.MaxEraBatchSize))
 	if err != nil {

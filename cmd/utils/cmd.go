@@ -293,7 +293,7 @@ func ExportAppendChain(blockchain *core.BlockChain, fn string, first uint64, las
 
 func ExportHistory(bc *core.BlockChain, dir string, first, last, step uint64) error {
 	log.Info("Exporting blockchain history", "dir", dir)
-	if head := bc.CurrentBlock().NumberU64(); head < last {
+	if head := bc.CurrentBlock().Number.Uint64(); head < last {
 		log.Warn("Last block beyond head, setting last = head", "head", head, "last", last)
 		last = head
 	}
