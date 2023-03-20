@@ -308,7 +308,7 @@ func ExportHistory(bc *core.BlockChain, dir string, first, last, step uint64) er
 		start    = time.Now()
 		reported = time.Now()
 	)
-	for i := uint64(first); i < last; i += step {
+	for i := first; i < last; i += step {
 		gen := func() error {
 			// Open file for Era.
 			fn := path.Join(dir, fmt.Sprintf("%s-%05d.era", network, i/step))
