@@ -123,7 +123,7 @@ be gzipped.`,
 		Action:    exportHistory,
 		Name:      "export-history",
 		Usage:     "Export blockchain history to Era archives",
-		ArgsUsage: "<dir> <first> <last> <step>",
+		ArgsUsage: "<dir> <first> <last>",
 		Flags:     flags.Merge(utils.DatabasePathFlags),
 		Description: `
 The export-history command will export blocks and their corresponding receipts
