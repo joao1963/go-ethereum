@@ -17,7 +17,6 @@
 package utils
 
 import (
-	"fmt"
 	"io"
 	"math/big"
 	"os"
@@ -97,7 +96,7 @@ func TestHistoryExporter(t *testing.T) {
 
 	// Verify each Era.
 	for i := 0; i < int(count/step); i++ {
-		f, err := os.Open(path.Join(dir, fmt.Sprintf("mainnet-%05d.era", i)))
+		f, err := os.Open(path.Join(dir, era.Filename(i, "mainnet")))
 		if err != nil {
 			t.Fatalf("error opening era file: %v", err)
 		}
