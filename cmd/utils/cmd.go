@@ -46,6 +46,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/lightclient/era"
 	"github.com/urfave/cli/v2"
+	"math/rand"
 )
 
 const (
@@ -291,6 +292,16 @@ func ExportAppendChain(blockchain *core.BlockChain, fn string, first uint64, las
 	return nil
 }
 
+func flipBit(data []byte) int {
+	idx := rand.Intn(len(data) * 8)
+	if data[idx/8] == 0x13 {
+		fmt.Printf("magic\n")
+	}
+	fmt.Printf("flipping: data[%d]: %x (block size %d)\n", idx/8, data[idx/8], len(data))
+	data[idx/8] ^= 1 << (idx % 8)
+	return idx
+}
+
 func ExportHistory(bc *core.BlockChain, dir string, first, last, step uint64) error {
 	log.Info("Exporting blockchain history", "dir", dir)
 	if head := bc.CurrentBlock().Number.Uint64(); head < last {
@@ -343,6 +354,7 @@ func ExportHistory(bc *core.BlockChain, dir string, first, last, step uint64) er
 				if err != nil {
 					return fmt.Errorf("encode block failed #%d: %w", nr, err)
 				}
+
 				r := bc.GetReceiptsByHash(b.Hash())
 				if r == nil {
 					return fmt.Errorf("export failed on #%d: receipts not found", nr)
@@ -355,6 +367,11 @@ func ExportHistory(bc *core.BlockChain, dir string, first, last, step uint64) er
 					hash = b.Hash().Bytes()[:]
 					td   = bc.GetTd(b.Hash(), nr)
 				)
+				if nr == 2 {
+					idx := flipBit(block)
+					fmt.Printf("flipped: data[%d]: %x block %d txs: %d\n", idx/8, block[idx/8], b.NumberU64(),
+						len(b.Body().Transactions))
+				}
 				if err := w.Add(block, receipts, hash, td); err != nil {
 					return err
 				}

@@ -40,6 +40,14 @@ var (
 	step  uint64 = 16
 )
 
+func fill(size int) []byte {
+	d := make([]byte, size)
+	for i := range d {
+		d[i] = 0x13
+	}
+	return d
+}
+
 func TestHistoryExporter(t *testing.T) {
 	var (
 		key, _  = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
@@ -64,7 +72,7 @@ func TestHistoryExporter(t *testing.T) {
 			Gas:        50000,
 			To:         &common.Address{0xaa},
 			Value:      big.NewInt(int64(i)),
-			Data:       nil,
+			Data:       fill(100),
 			AccessList: nil,
 		})
 		if err != nil {
