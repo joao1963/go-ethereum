@@ -648,6 +648,19 @@ func (pool *TxPool) validateTxBasics(tx *types.Transaction, local bool) error {
 	if _, err := types.Sender(pool.signer, tx); err != nil {
 		return ErrInvalidSender
 	}
+	// Ensure the transaction has more gas than the basic tx fee.
+	if intrGas, err := core.IntrinsicGas(tx.Data(), tx.AccessList(), tx.To() == nil, true, pool.istanbul.Load(), pool.shanghai.Load()); err != nil {
+		return err
+	} else if tx.Gas() < intrGas {
+		return core.ErrIntrinsicGas
+	}
+	return nil
+}
+
+// validateTxState assumes that the basic transaction validity checks have been performed
+// ( in validateTxBasics), and checks wether the transaction is valid given
+// the txpool state: sufficient balance, correct nonce etc.
+func (pool *TxPool) validateTxState(tx *types.Transaction, local bool) error {
 	// Drop non-local transactions under our own minimal accepted gas price or tip
 	if !local && tx.GasTipCapIntCmp(pool.gasPrice) < 0 {
 		return ErrUnderpriced
@@ -678,7 +691,6 @@ func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 	if balance.Cmp(tx.Cost()) < 0 {
 		return core.ErrInsufficientFunds
 	}
-
 	// Verify that replacing transactions will not result in overdraft
 	list := pool.pending[from]
 	if list != nil { // Sender already has pending txs
@@ -704,23 +716,19 @@ func (pool *TxPool) add(tx *types.Transaction, local bool) (replaced bool, err e
 	if added {
 		return replaced, err
 	}
-	pool.addLimbo(tx)
+	// If there was no error, but it was not added to the pending, that means
+	// it was not executable straight away. Place it in limbo.
+	pool.limbo.Add(tx)
 	return false, nil
 }
 
-func (pool *TxPool) addLimbo(tx *types.Transaction) (added, replaced bool, err error) {
-	added = pool.limbo.Add(tx)
-	return added, false, nil
-}
-
-// isFuture reports whether the given transaction is immediately executable.
+// isExecutable reports whether the given transaction is immediately executable.
 func (pool *TxPool) isExecutable(from common.Address, tx *types.Transaction) bool {
-	list := pool.pending[from]
-	if list == nil {
-		return pool.pendingNonces.get(from) == tx.Nonce()
+	if list := pool.pending[from]; list != nil {
+		// Does parent nonce exist in pending?
+		return list.txs.Get(tx.Nonce()-1) != nil
 	}
-	// Does parent nonce exist in pending?
-	return list.txs.Get(tx.Nonce()-1) != nil
+	return pool.pendingNonces.get(from) == tx.Nonce()
 	// Replacements are handled later
 }
 
@@ -745,7 +753,7 @@ func (pool *TxPool) addPending(tx *types.Transaction, local bool) (added, replac
 	isLocal := local || pool.locals.containsTx(tx)
 
 	// If the transaction fails basic validation, discard it
-	if err := pool.validateTx(tx, isLocal); err != nil {
+	if err := pool.validateTxState(tx, isLocal); err != nil {
 		log.Trace("Discarding invalid transaction", "hash", hash, "err", err)
 		invalidTxMeter.Mark(1)
 		return false, false, err
@@ -829,28 +837,6 @@ func (pool *TxPool) addPending(tx *types.Transaction, local bool) (added, replac
 	}
 	pool.journalTx(from, tx)
 	return true, replaced, nil
-}
-
-// isGapped reports whether the given transaction is immediately executable.
-func (pool *TxPool) isGapped(from common.Address, tx *types.Transaction) bool {
-	// Short circuit if transaction matches pending nonce and can be promoted
-	// to pending list as an executable transaction.
-	next := pool.pendingNonces.get(from)
-	if tx.Nonce() == next {
-		return false
-	}
-	// The transaction has a nonce gap with pending list, it's only considered
-	// as executable if transactions in queue can fill up the nonce gap.
-	queue, ok := pool.queue[from]
-	if !ok {
-		return true
-	}
-	for nonce := next; nonce < tx.Nonce(); nonce++ {
-		if !queue.Contains(nonce) {
-			return true // txs in queue can't fill up the nonce gap
-		}
-	}
-	return false
 }
 
 // enqueueTx inserts a new transaction into the non-executable transaction queue.
