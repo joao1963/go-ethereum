@@ -49,6 +49,16 @@ type Trie struct {
 	// tracer is the tool to track the trie changes.
 	// It will be reset after each commit operation.
 	tracer *tracer
+
+	// ephemeral means that this trie is short-lived, e.g. for use in constructing proofs.
+	// For ephemeral tries, we assume that the lifecycle looks like this:
+	// 1. Creation
+	// 2. Filling the trie
+	// 3. Hash/commit
+	// And after this, no more updates. An ephemeral trie 'cheats' in a few different
+	// ways: it avoids copy-on-insert (just overwrites nodes), and avoids writing
+	// to the tracer.
+	ephemeral bool
 }
 
 // newFlag returns the cache flag value for a newly created node.
@@ -321,7 +331,9 @@ func (t *Trie) insert(n node, prefix, key []byte, value node) (bool, node, error
 		// New branch node is created as a child of the original short node.
 		// Track the newly inserted node in the tracer. The node identifier
 		// passed is the path from the root node.
-		t.tracer.onInsert(append(prefix, key[:matchlen]...))
+		if !t.ephemeral {
+			t.tracer.onInsert(append(prefix, key[:matchlen]...))
+		}
 
 		// Replace it with a short node leading up to the branch.
 		return true, &shortNode{key[:matchlen], branch, t.newFlag()}, nil
@@ -331,7 +343,15 @@ func (t *Trie) insert(n node, prefix, key []byte, value node) (bool, node, error
 		if !dirty || err != nil {
 			return false, n, err
 		}
-		n = n.copy()
+		// If we're in 'ephemeral' mode, avoid copy.
+		if t.ephemeral {
+			if h, dirty := n.cache(); !dirty || h != nil {
+				// This node is either not dirty, or already hashed. We copy it
+				n = n.copy()
+			}
+		} else {
+			n = n.copy() // Always copy-on-modify for the regular trie.
+		}
 		n.flags = t.newFlag()
 		n.Children[key[0]] = nn
 		return true, n, nil
@@ -340,7 +360,9 @@ func (t *Trie) insert(n node, prefix, key []byte, value node) (bool, node, error
 		// New short node is created and track it in the tracer. The node identifier
 		// passed is the path from the root node. Note the valueNode won't be tracked
 		// since it's always embedded in its parent.
-		t.tracer.onInsert(prefix)
+		if !t.ephemeral {
+			t.tracer.onInsert(prefix)
+		}
 
 		return true, &shortNode{key, value, t.newFlag()}, nil
 
