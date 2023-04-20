@@ -608,7 +608,7 @@ func ReadRawReceipts(db ethdb.Reader, hash common.Hash, number uint64) types.Rec
 	// Convert the receipts from their storage form to their internal representation
 	storageReceipts := []*types.ReceiptForStorage{}
 	if err := rlp.DecodeBytes(data, &storageReceipts); err != nil {
-		log.Error("Invalid receipt array RLP", "hash", hash, "err", err)
+		log.Error("Invalid receipt array RLP", "hash", hash.String(), "number", number, "dbkey", blockReceiptsKey(number, hash), "err", err)
 		return nil
 	}
 	receipts := make(types.Receipts, len(storageReceipts))
