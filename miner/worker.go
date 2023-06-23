@@ -910,19 +910,8 @@ func (w *worker) fillTransactions(interrupt *atomic.Int32, env *environment) err
 	)
 	log.Trace("Side-effect log, much wow", "blobs", len(blobtxs))*/
 
-	localTxs, remoteTxs := make(map[common.Address][]*types.Transaction), pending
-	for _, account := range w.eth.TxPool().Locals() {
-		if txs := remoteTxs[account]; len(txs) > 0 {
-			delete(remoteTxs, account)
-			localTxs[account] = txs
-		}
-	}
-	if len(localTxs) > 0 {
-		txs := types.NewTransactionsByPriceAndNonce(env.signer, localTxs, env.header.BaseFee)
-		if err := w.commitTransactions(env, txs, interrupt); err != nil {
-			return err
-		}
-	}
+	remoteTxs := pending
+	
 	if len(remoteTxs) > 0 {
 		txs := types.NewTransactionsByPriceAndNonce(env.signer, remoteTxs, env.header.BaseFee)
 		if err := w.commitTransactions(env, txs, interrupt); err != nil {

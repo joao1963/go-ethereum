@@ -64,6 +64,16 @@ func NewTxTracker(journalPath string, journalTime time.Duration, chainConfig *pa
 		pool.journal = newTxJournal(journalPath)
 		pool.rejournal = journalTime
 	}
+	/*
+		TODO?
+		Do we want to have an accountset of marked local addresses?
+		pool.locals = newAccountSet(pool.signer)
+		for _, addr := range config.Locals {
+			log.Info("Setting new local account", "address", addr)
+			pool.locals.add(addr)
+		}
+	*/
+
 	return pool
 }
 
@@ -88,6 +98,13 @@ func (tracker *TxTracker) TrackAll(txs []*types.Transaction) {
 		}
 		tracker.byAddr[addr].Put(tx)
 	}
+	/*
+		TODO: Do we want to explicitly journal them one by one, or (like now),
+		keep it in-mem, and rotate all to disk every N minutes?
+		if err := pool.journal.insert(tx); err != nil {
+			log.Warn("Failed to journal local transaction", "err", err)
+		}
+	*/
 }
 
 // recheck checks and returns any transactions that needs to be resubmitted.
@@ -169,7 +186,7 @@ func (tracker *TxTracker) loop() {
 			checkJournal := time.Since(lastJournal) > tracker.rejournal
 			resubmits, rejournal := tracker.recheck(checkJournal)
 			if len(resubmits) > 0 {
-				tracker.pool.Add(resubmits, false, false)
+				tracker.pool.Add(resubmits, false)
 			}
 			if checkJournal {
 				lastJournal = time.Now()
