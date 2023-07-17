@@ -206,25 +206,21 @@ func Transition(ctx *cli.Context) error {
 				return err
 			}
 			var txs types.Transactions
-			if true {
-				if err := rlp.DecodeBytes(body, &txs); err != nil {
-					return err
-				}
-			} else {
-				it, err := rlp.NewListIterator([]byte(body))
+			it, err := rlp.NewListIterator([]byte(body))
+			if err != nil {
+				return err
+			}
+			for i := 0; it.Next(); i++ {
+				var tx = new(types.Transaction)
+				err := tx.UnmarshalBinary(it.Value())
 				if err != nil {
-					return err
+					log.Warn("early reject tx", "index", i, "error", err)
+					//txs = append(txs, nil)
+					//return err
+					continue
 				}
-				for it.Next() {
-					var tx = new(types.Transaction)
-					err := tx.UnmarshalBinary(it.Value())
-					if err != nil {
-						//txs = append(txs, nil)
-						//return err
-						continue
-					}
-					txs = append(txs, tx)
-				}
+				txs = append(txs, tx)
+
 			}
 			for _, tx := range txs {
 				txsWithKeys = append(txsWithKeys, &txWithKey{

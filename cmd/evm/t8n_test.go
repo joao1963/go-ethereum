@@ -289,6 +289,9 @@ func TestT8n(t *testing.T) {
 				t.Fatalf("test %d: could not read expected output: %v", i, err)
 			}
 			have := tt.Output()
+			if !json.Valid(have) {
+				t.Fatalf("invalid json output: %v", have)
+			}
 			ok, err := cmpJson(have, want)
 			switch {
 			case err != nil:
