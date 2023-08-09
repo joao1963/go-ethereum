@@ -63,6 +63,7 @@ type Backend interface {
 	GetBody(ctx context.Context, hash common.Hash, number rpc.BlockNumber) (*types.Body, error)
 	GetReceipts(ctx context.Context, blockHash common.Hash) (types.Receipts, error)
 	GetLogs(ctx context.Context, blockHash common.Hash, number uint64) ([][]*types.Log, error)
+	GetFilteredLogs(ctx context.Context, blockHash common.Hash, number uint64, filter func([]byte) bool) ([][]*types.Log, error)
 	PendingBlockAndReceipts() (*types.Block, types.Receipts)
 
 	CurrentHeader() *types.Header
@@ -100,13 +101,12 @@ type logCacheElem struct {
 }
 
 // cachedLogElem loads block logs from the backend and caches the result.
-func (sys *FilterSystem) cachedLogElem(ctx context.Context, blockHash common.Hash, number uint64) (*logCacheElem, error) {
+func (sys *FilterSystem) cachedLogElem(ctx context.Context, blockHash common.Hash, number uint64, filter func([]byte) bool) (*logCacheElem, error) {
 	cached, ok := sys.logsCache.Get(blockHash)
 	if ok {
 		return cached, nil
 	}
-
-	logs, err := sys.backend.GetLogs(ctx, blockHash, number)
+	logs, err := sys.backend.GetFilteredLogs(ctx, blockHash, number, filter)
 	if err != nil {
 		return nil, err
 	}
@@ -128,7 +128,9 @@ func (sys *FilterSystem) cachedLogElem(ctx context.Context, blockHash common.Has
 		}
 	}
 	elem := &logCacheElem{logs: flattened}
-	sys.logsCache.Add(blockHash, elem)
+	if filter == nil { // If we have filtered, the flattened list is only partial and must not be cached.
+		sys.logsCache.Add(blockHash, elem)
+	}
 	return elem, nil
 }
 
@@ -512,7 +514,7 @@ func (es *EventSystem) lightFilterLogs(header *types.Header, addresses []common.
 	// Get the logs of the block
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	cached, err := es.sys.cachedLogElem(ctx, header.Hash(), header.Number.Uint64())
+	cached, err := es.sys.cachedLogElem(ctx, header.Hash(), header.Number.Uint64(), nil)
 	if err != nil {
 		return nil
 	}

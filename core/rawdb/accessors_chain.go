@@ -728,6 +728,44 @@ func deriveLogFields(receipts []*receiptLogs, hash common.Hash, number uint64, t
 	return nil
 }
 
+// ReadLogsFiltered retrieves the logs for all transactions in a block, but removes
+// logs that do not match according to the given filter function.
+// Note: ReadLogsFiltered does not derive unstored log fields.
+func ReadLogsFiltered(db ethdb.Reader, hash common.Hash, number uint64, filter func([]byte) bool) [][]*types.Log {
+	// Retrieve the flattened receipt slice
+	data := ReadReceiptsRLP(db, hash, number)
+	if len(data) == 0 {
+		return nil
+	}
+	// We expect the input to be a list of types.Receipt
+	it, err := rlp.NewListIterator(data)
+	if err != nil {
+		log.Error("Invalid receipt array RLP", "hash", hash, "err", err)
+		return nil
+	}
+	var (
+		logs = make([][]*types.Log, 0)
+		r    receiptLogs
+	)
+	for it.Next() {
+		rlpblob := it.Value()
+		if filter != nil && !filter(rlpblob) {
+			// We add a nil element here. This ensures that there is one list
+			// of logs per transaction, so that N txs in a block returns
+			// N logs-list, and the calling code can determine the txindex
+			// for each log entry.
+			logs = append(logs, nil)
+			continue
+		}
+		if err := rlp.DecodeBytes(rlpblob, &r); err != nil {
+			log.Error("Invalid receipt array RLP", "hash", hash, "err", err)
+			return nil
+		}
+		logs = append(logs, r.Logs)
+	}
+	return logs
+}
+
 // ReadLogs retrieves the logs for all transactions in a block. In case
 // receipts is not found, a nil is returned.
 // Note: ReadLogs does not derive unstored log fields.

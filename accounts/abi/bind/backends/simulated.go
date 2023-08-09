@@ -896,6 +896,11 @@ func (fb *filterBackend) GetLogs(ctx context.Context, hash common.Hash, number u
 	return logs, nil
 }
 
+func (fb *filterBackend) GetFilteredLogs(ctx context.Context, hash common.Hash, number uint64, filter func([]byte) bool) ([][]*types.Log, error) {
+	logs := rawdb.ReadLogsFiltered(fb.db, hash, number, filter)
+	return logs, nil
+}
+
 func (fb *filterBackend) SubscribeNewTxsEvent(ch chan<- core.NewTxsEvent) event.Subscription {
 	return nullSubscription()
 }

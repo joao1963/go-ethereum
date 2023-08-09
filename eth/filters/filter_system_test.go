@@ -125,6 +125,11 @@ func (b *testBackend) GetLogs(ctx context.Context, hash common.Hash, number uint
 	return logs, nil
 }
 
+func (b *testBackend) GetFilteredLogs(ctx context.Context, hash common.Hash, number uint64, filter func([]byte) bool) ([][]*types.Log, error) {
+	logs := rawdb.ReadLogsFiltered(b.db, hash, number, filter)
+	return logs, nil
+}
+
 func (b *testBackend) PendingBlockAndReceipts() (*types.Block, types.Receipts) {
 	return b.pendingBlock, b.pendingReceipts
 }

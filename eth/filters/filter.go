@@ -17,6 +17,7 @@
 package filters
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"math/big"
@@ -305,7 +306,8 @@ func (f *Filter) checkMatches(ctx context.Context, header *types.Header) ([]*typ
 	// such as tx index, block hash, etc.
 	// Notably tx hash is NOT filled in because it needs
 	// access to block body data.
-	cached, err := f.sys.cachedLogElem(ctx, hash, header.Number.Uint64())
+	blobFilter := makeRLPFilter(f.addresses, f.topics)
+	cached, err := f.sys.cachedLogElem(ctx, hash, header.Number.Uint64(), blobFilter)
 	if err != nil {
 		return nil, err
 	}
@@ -390,6 +392,43 @@ func filterLogs(logs []*types.Log, fromBlock, toBlock *big.Int, addresses []comm
 		}
 	}
 	return ret
+}
+
+// makeRLPFilter returns a filter-closure that can be used for early filtering,
+// before RLP decoding happens.
+func makeRLPFilter(addresses []common.Address, topics [][]common.Hash) func([]byte) bool {
+	return func(rlpData []byte) bool {
+		if len(addresses) > 0 {
+			// If addresses are specified, then at least one of them needs to be present in the blob
+			match := false
+			for _, a := range addresses {
+				if bytes.Contains(rlpData, a[:]) {
+					match = true
+					break
+				}
+			}
+			if !match {
+				return false
+			}
+		}
+		if len(topics) == 0 {
+			return true
+		}
+		// If any topic is present, we give a thumb up
+		// We can be stricter here if we want to
+		for _, sub := range topics {
+			if len(sub) == 0 {
+				return true
+			}
+			for _, s := range sub {
+				if bytes.Contains(rlpData, s[:]) {
+					return true
+				}
+			}
+		}
+		// None of the topics are present.
+		return false
+	}
 }
 
 func bloomFilter(bloom types.Bloom, addresses []common.Address, topics [][]common.Hash) bool {

@@ -520,6 +520,9 @@ func (b testBackend) Engine() consensus.Engine         { return b.chain.Engine()
 func (b testBackend) GetLogs(ctx context.Context, blockHash common.Hash, number uint64) ([][]*types.Log, error) {
 	panic("implement me")
 }
+func (b testBackend) GetFilteredLogs(ctx context.Context, blockHash common.Hash, number uint64, filter func([]byte) bool) ([][]*types.Log, error) {
+	panic("implement me")
+}
 func (b testBackend) SubscribeRemovedLogsEvent(ch chan<- core.RemovedLogsEvent) event.Subscription {
 	panic("implement me")
 }
