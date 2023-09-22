@@ -76,6 +76,29 @@ func BenchmarkAdd(b *testing.B) {
 	}
 }
 
+func BenchmarkAddGet(b *testing.B) {
+	bloom, _ := NewExpiringBloom(2, 1024, 10*time.Second)
+
+	var putKey = make([]byte, 8)
+	var getKey = make([]byte, 8)
+	for i := 0; i < b.N; i++ {
+		binary.BigEndian.PutUint64(putKey, uint64(i))
+		bloom.Add(hashable(putKey))
+		binary.BigEndian.PutUint64(getKey, uint64(i^(i>>1)))
+		_ = bloom.Contains(hashable(getKey))
+	}
+}
+
+func BenchmarkGetEmpty(b *testing.B) {
+	bloom, _ := NewExpiringBloom(10, 42*1024, 10*time.Second)
+	var key = make([]byte, 8)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		binary.BigEndian.PutUint64(key, uint64(i))
+		_ = bloom.Contains(hashable(key))
+	}
+}
+
 func BenchmarkTick(b *testing.B) {
 	bloom, _ := NewExpiringBloom(2, 1024, 10*time.Second)
 
