@@ -2,7 +2,6 @@ package bloom
 
 import (
 	"hash"
-	"sync"
 	"time"
 
 	bloomfilter "github.com/holiman/bloomfilter/v2"
@@ -37,8 +36,8 @@ func NewExpiringBloom(n, m uint64, timeout time.Duration) (*ExpiringBloom, error
 
 func (e *ExpiringBloom) tick() {
 	// Advance the current bloom
-	e.currentBloom.Store((e.currentBloom.Load() + 1) % len(e.blooms))
-	e.blooms[e.currentBloom.Load()].Clear() // Clear it
+	e.currentBloom.Store((e.currentBloom.Load() + 1) % uint64(len(e.blooms)))
+	e.blooms[int(e.currentBloom.Load())].Clear() // Clear it
 }
 
 func (e *ExpiringBloom) Add(key hash.Hash64) {

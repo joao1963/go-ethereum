@@ -38,7 +38,7 @@ require (
 	github.com/graph-gophers/graphql-go v1.3.0
 	github.com/hashicorp/go-bexpr v0.1.10
 	github.com/holiman/billy v0.0.0-20230718173358-1c7e68d277a7
-	github.com/holiman/bloomfilter/v2 v2.0.3
+	github.com/holiman/bloomfilter/v2 v2.0.4-0.20230921165834-01c2a6158758
 	github.com/holiman/uint256 v1.2.3
 	github.com/huin/goupnp v1.3.0
 	github.com/influxdata/influxdb-client-go/v2 v2.4.0
