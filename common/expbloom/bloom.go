@@ -6,6 +6,7 @@ import (
 	"time"
 
 	bloomfilter "github.com/holiman/bloomfilter/v2"
+	"sync/atomic"
 )
 
 const (
@@ -13,89 +14,42 @@ const (
 )
 
 type ExpiringBloom struct {
-	currentBloom int
-	union        *bloomfilter.Filter
+	currentBloom atomic.Uint64
 	blooms       []*bloomfilter.Filter
-	size         uint64
-
-	timer *time.Ticker
-	// Mutex lock the currentBloom and union variables
-	mu      sync.RWMutex
-	closeCh chan struct{}
 }
 
 func NewExpiringBloom(n, m uint64, timeout time.Duration) (*ExpiringBloom, error) {
-	union, err := bloomfilter.New(m*8, k)
-	if err != nil {
-		return nil, err
-	}
-
 	blooms := make([]*bloomfilter.Filter, 0, n)
+	if filter, err := bloomfilter.New(m*8, k); err != nil {
+		return nil, err
+	} else {
+		blooms = append(blooms, filter)
+	}
 	for i := 0; i < int(n); i++ {
-		filter, err := union.NewCompatible()
+		filter, err := blooms[0].NewCompatible()
 		if err != nil {
 			return nil, err
 		}
 		blooms = append(blooms, filter)
 	}
-
-	filter := ExpiringBloom{
-		currentBloom: 0,
-		blooms:       blooms,
-		union:        union,
-		size:         m * 8,
-		timer:        time.NewTicker(timeout),
-		closeCh:      make(chan struct{}),
-	}
-	go filter.loop()
-
-	return &filter, nil
-}
-
-func (e *ExpiringBloom) loop() {
-	for {
-		select {
-		case <-e.timer.C:
-			e.tick()
-		case <-e.closeCh:
-			return
-		}
-	}
+	return &ExpiringBloom{blooms: blooms}, nil
 }
 
 func (e *ExpiringBloom) tick() {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-
 	// Advance the current bloom
-	e.currentBloom++
-	if e.currentBloom == len(e.blooms) {
-		e.currentBloom = 0
-	}
-	// Clear the filter
-	e.blooms[e.currentBloom], _ = e.blooms[e.currentBloom].NewCompatible()
-	// Recreate the union filter
-	e.union, _ = e.union.NewCompatible()
-	for _, bloom := range e.blooms {
-		e.union.UnionInPlace(bloom)
-	}
-}
-
-func (e *ExpiringBloom) Stop() {
-	close(e.closeCh)
+	e.currentBloom.Store((e.currentBloom.Load() + 1) % len(e.blooms))
+	e.blooms[e.currentBloom.Load()].Clear() // Clear it
 }
 
 func (e *ExpiringBloom) Add(key hash.Hash64) {
-	e.mu.RLock()
-	defer e.mu.RUnlock()
-
-	e.blooms[e.currentBloom].Add(key)
-	e.union.Add(key)
+	e.blooms[e.currentBloom.Load()].Add(key)
 }
 
 func (e *ExpiringBloom) Contains(key hash.Hash64) bool {
-	e.mu.RLock()
-	defer e.mu.RUnlock()
-
-	return e.union.Contains(key)
+	for _, bloom := range e.blooms {
+		if bloom.Contains(key) {
+			return true
+		}
+	}
+	return false
 }
