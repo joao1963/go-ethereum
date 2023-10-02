@@ -6,6 +6,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
+	"github.com/ethereum/go-ethereum/rlp"
 )
 
 // nodeToStNode converts from `node` to `*stNode`.
@@ -41,6 +42,55 @@ func nodeToStNode(n node, key []byte) *stNode {
 		panic(fmt.Sprintf("%T", n))
 	}
 	return st
+}
+
+// stNodeToNode converts from `*stNode` to `node`.
+func stNodeToNode(st *stNode) node {
+	switch st.nodeType {
+	case extNode: // a shortnode
+		n := &shortNode{flags: newFlag()}
+		n.Key = common.CopyBytes(st.key)
+		n.Val = stNodeToNode(st.children[0])
+		return n
+	case branchNode: // a fullnode
+		n := &fullNode{flags: newFlag()}
+		for i, child := range st.children {
+			if child != nil {
+				n.Children[i] = stNodeToNode(child)
+			}
+		}
+		return n
+	case hashedNode: // an unresolved/hashed node
+		if len(st.val) == 32 {
+			n := make(hashNode, 32)
+			copy(n, st.val)
+			return n
+		}
+		// This is a shortnode, embedded inside the parent.
+		// The stacktrie represents this case by rlp-encoding the node into
+		// a hashnode, whereas the regular trie represents it as a regular
+		// node within another node.
+		// Therefore, we need to unmarshal the RLP back into a shortnode containing
+		// the value.
+		var dec struct {
+			K []byte
+			V []byte
+		}
+		rlp.DecodeBytes(st.val, &dec)
+		return &shortNode{
+			Key:   compactToHex(dec.K),
+			Val:   valueNode(dec.V),
+			flags: newFlag(),
+		}
+	case leafNode: // a valuenode
+		vn := make(valueNode, len(st.val))
+		copy(vn, st.val)
+		n := &shortNode{flags: newFlag(), Key: common.CopyBytes(st.key), Val: vn}
+		n.Key = append(n.Key, 16) // Add terminator
+		return n
+	}
+
+	panic(fmt.Sprintf("unexpected type: %v", st.nodeType))
 }
 
 func resolveFromProof(proofDb ethdb.KeyValueReader, hash common.Hash) (node, error) {
@@ -126,6 +176,14 @@ func newStackTrieFromProof(rootHash common.Hash, key []byte, proofDb ethdb.KeyVa
 		parent = child
 		stParent = stChild
 	}
+}
+
+// toRegularTrie converts stack to a regular *trie.Trie.
+func (stack *StackTrie) toRegularTrie() *Trie {
+	tr := NewEmpty(nil)
+	tr.root = stNodeToNode(stack.root)
+	tr.owner = stack.owner
+	return tr
 }
 
 func (st *stNode) dumpTrie(lvl int) {

@@ -97,3 +97,51 @@ func testStRangeProofLeftside(t *testing.T, trie *Trie, vals map[string]*kv) {
 		}
 	}
 }
+
+func TestStackToRegularSmallValue(t *testing.T) {
+	trie := NewEmpty(NewDatabase(rawdb.NewMemoryDatabase(), nil))
+	vals := make(map[string]*kv)
+	//This loop creates a few dense nodes with small leafs: hence will
+	//cause embedded nodes.
+	for i := byte(1); i < 200; i++ {
+		value := &kv{
+			common.LeftPadBytes([]byte{i}, 32), []byte{i}, false}
+		trie.MustUpdate(value.k, value.v)
+		vals[string(value.k)] = value
+	}
+	testStackToRegular(t, trie, vals)
+}
+
+func TestStackToRegular(t *testing.T) {
+	trie, vals := randomTrie(1024)
+	testStackToRegular(t, trie, vals)
+}
+
+func testStackToRegular(t *testing.T, trie *Trie, vals map[string]*kv) {
+	var (
+		want    = trie.Hash()
+		entries []*kv
+	)
+	for _, kv := range vals {
+		entries = append(entries, kv)
+	}
+	slices.SortFunc(entries, (*kv).cmp)
+	for start := 10; start < len(vals); start *= 2 {
+		// Initiate a reference stacktrie without proof (filling manually)
+		stack := NewStackTrie(nil)
+		for i := 0; i < start; i++ { // do prefill
+			k, v := common.CopyBytes(entries[i].k), common.CopyBytes(entries[i].v)
+			stack.Update(k, v)
+		}
+		// Convert to trie
+		cTrie := stack.toRegularTrie()
+		// Feed the remaining values into it
+		for i := start; i < len(vals); i++ {
+			cTrie.Update(entries[i].k, common.CopyBytes(entries[i].v))
+		}
+		// Verify the final trie hash
+		if have := cTrie.Hash(); have != want {
+			t.Fatalf("wrong hash, have %x want %x\n", have, want)
+		}
+	}
+}
