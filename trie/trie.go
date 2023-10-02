@@ -57,7 +57,7 @@ type Trie struct {
 }
 
 // newFlag returns the cache flag value for a newly created node.
-func (t *Trie) newFlag() nodeFlag {
+func newFlag() nodeFlag {
 	return nodeFlag{dirty: true}
 }
 
@@ -343,10 +343,10 @@ func (t *Trie) insert(n node, prefix, key []byte, value node) (bool, node, error
 			if !dirty || err != nil {
 				return false, n, err
 			}
-			return true, &shortNode{n.Key, nn, t.newFlag()}, nil
+			return true, &shortNode{n.Key, nn, newFlag()}, nil
 		}
 		// Otherwise branch out at the index where they differ.
-		branch := &fullNode{flags: t.newFlag()}
+		branch := &fullNode{flags: newFlag()}
 		var err error
 		_, branch.Children[n.Key[matchlen]], err = t.insert(nil, append(prefix, n.Key[:matchlen+1]...), n.Key[matchlen+1:], n.Val)
 		if err != nil {
@@ -366,7 +366,7 @@ func (t *Trie) insert(n node, prefix, key []byte, value node) (bool, node, error
 		t.tracer.onInsert(append(prefix, key[:matchlen]...))
 
 		// Replace it with a short node leading up to the branch.
-		return true, &shortNode{key[:matchlen], branch, t.newFlag()}, nil
+		return true, &shortNode{key[:matchlen], branch, newFlag()}, nil
 
 	case *fullNode:
 		dirty, nn, err := t.insert(n.Children[key[0]], append(prefix, key[0]), key[1:], value)
@@ -374,7 +374,7 @@ func (t *Trie) insert(n node, prefix, key []byte, value node) (bool, node, error
 			return false, n, err
 		}
 		n = n.copy()
-		n.flags = t.newFlag()
+		n.flags = newFlag()
 		n.Children[key[0]] = nn
 		return true, n, nil
 
@@ -384,7 +384,7 @@ func (t *Trie) insert(n node, prefix, key []byte, value node) (bool, node, error
 		// since it's always embedded in its parent.
 		t.tracer.onInsert(prefix)
 
-		return true, &shortNode{key, value, t.newFlag()}, nil
+		return true, &shortNode{key, value, newFlag()}, nil
 
 	case hashNode:
 		// We've hit a part of the trie that isn't loaded yet. Load
@@ -470,9 +470,9 @@ func (t *Trie) delete(n node, prefix, key []byte) (bool, node, error) {
 			// always creates a new slice) instead of append to
 			// avoid modifying n.Key since it might be shared with
 			// other nodes.
-			return true, &shortNode{concat(n.Key, child.Key...), child.Val, t.newFlag()}, nil
+			return true, &shortNode{concat(n.Key, child.Key...), child.Val, newFlag()}, nil
 		default:
-			return true, &shortNode{n.Key, child, t.newFlag()}, nil
+			return true, &shortNode{n.Key, child, newFlag()}, nil
 		}
 
 	case *fullNode:
@@ -481,7 +481,7 @@ func (t *Trie) delete(n node, prefix, key []byte) (bool, node, error) {
 			return false, n, err
 		}
 		n = n.copy()
-		n.flags = t.newFlag()
+		n.flags = newFlag()
 		n.Children[key[0]] = nn
 
 		// Because n is a full node, it must've contained at least two children
@@ -531,12 +531,12 @@ func (t *Trie) delete(n node, prefix, key []byte) (bool, node, error) {
 					t.tracer.onDelete(append(prefix, byte(pos)))
 
 					k := append([]byte{byte(pos)}, cnode.Key...)
-					return true, &shortNode{k, cnode.Val, t.newFlag()}, nil
+					return true, &shortNode{k, cnode.Val, newFlag()}, nil
 				}
 			}
 			// Otherwise, n is replaced by a one-nibble short node
 			// containing the child.
-			return true, &shortNode{[]byte{byte(pos)}, n.Children[pos], t.newFlag()}, nil
+			return true, &shortNode{[]byte{byte(pos)}, n.Children[pos], newFlag()}, nil
 		}
 		// n still contains at least two values and cannot be reduced.
 		return true, n, nil
