@@ -391,6 +391,52 @@ func (f *TxFetcher) Stop() {
 	close(f.quit)
 }
 
+func (f *TxFetcher) processTxDelivery(delivery *txDelivery, callback func(announced, actual *txMetadata, peer string, hash common.Hash)) {
+	for i, hash := range delivery.hashes {
+		// Each of the delivered hashes should have a corresponding announcement,
+		// either in the waitlist, or the announces.
+		if _, ok := f.waitlist[hash]; ok {
+			for peer, txset := range f.waitslots {
+				if meta := txset[hash]; meta != nil {
+					callback(&delivery.metas[i], meta, peer, hash)
+				}
+				delete(txset, hash)
+				if len(txset) == 0 {
+					delete(f.waitslots, peer)
+				}
+			}
+			delete(f.waitlist, hash)
+			delete(f.waittime, hash)
+			continue
+		}
+		for peer, txset := range f.announces {
+			if meta := txset[hash]; meta != nil {
+				callback(&delivery.metas[i], meta, peer, hash)
+			}
+			delete(txset, hash)
+			if len(txset) == 0 {
+				delete(f.announces, peer)
+			}
+		}
+		delete(f.announced, hash)
+		delete(f.alternates, hash)
+
+		// If a transaction currently being fetched from a different
+		// origin was delivered (delivery stolen), mark it so the
+		// actual delivery won't double schedule it.
+		if origin, ok := f.fetching[hash]; ok && (origin != delivery.origin || !delivery.direct) {
+			stolen := f.requests[origin].stolen
+			if stolen == nil {
+				f.requests[origin].stolen = make(map[common.Hash]struct{})
+				stolen = f.requests[origin].stolen
+			}
+			stolen[hash] = struct{}{}
+		}
+		delete(f.fetching, hash)
+
+	}
+}
+
 func (f *TxFetcher) loop() {
 	var (
 		waitTimer    = new(mclock.Timer)
@@ -579,72 +625,22 @@ func (f *TxFetcher) loop() {
 			// Independent if the delivery was direct or broadcast, remove all
 			// traces of the hash from internal trackers. That said, compare any
 			// advertised metadata with the real ones and drop bad peers.
-			for i, hash := range delivery.hashes {
-				if _, ok := f.waitlist[hash]; ok {
-					for peer, txset := range f.waitslots {
-						if meta := txset[hash]; meta != nil {
-							if delivery.metas[i].kind != meta.kind {
-								log.Warn("Announced transaction type mismatch", "peer", peer, "tx", hash, "type", delivery.metas[i].kind, "ann", meta.kind)
-								f.dropPeer(peer)
-							} else if delivery.metas[i].size != meta.size {
-								log.Warn("Announced transaction size mismatch", "peer", peer, "tx", hash, "size", delivery.metas[i].size, "ann", meta.size)
-								if math.Abs(float64(delivery.metas[i].size)-float64(meta.size)) > 8 {
-									// Normally we should drop a peer considering this is a protocol violation.
-									// However, due to the RLP vs consensus format messyness, allow a few bytes
-									// wiggle-room where we only warn, but don't drop.
-									//
-									// TODO(karalabe): Get rid of this relaxation when clients are proven stable.
-									f.dropPeer(peer)
-								}
-							}
-						}
-						delete(txset, hash)
-						if len(txset) == 0 {
-							delete(f.waitslots, peer)
-						}
+			f.processTxDelivery(delivery, func(announced, actual *txMetadata, peer string, hash common.Hash) {
+				if announced.kind != actual.kind {
+					log.Warn("Announced transaction type mismatch", "peer", peer, "tx", hash, "type", announced.kind, "ann", actual.kind)
+					f.dropPeer(peer)
+				} else if announced.size != actual.size {
+					log.Warn("Announced transaction size mismatch", "peer", peer, "tx", hash, "size", announced.size, "ann", actual.size)
+					if math.Abs(float64(announced.size)-float64(actual.size)) > 8 {
+						// Normally we should drop a peer considering this is a protocol violation.
+						// However, due to the RLP vs consensus format messyness, allow a few bytes
+						// wiggle-room where we only warn, but don't drop.
+						//
+						// TODO(karalabe): Get rid of this relaxation when clients are proven stable.
+						f.dropPeer(peer)
 					}
-					delete(f.waitlist, hash)
-					delete(f.waittime, hash)
-				} else {
-					for peer, txset := range f.announces {
-						if meta := txset[hash]; meta != nil {
-							if delivery.metas[i].kind != meta.kind {
-								log.Warn("Announced transaction type mismatch", "peer", peer, "tx", hash, "type", delivery.metas[i].kind, "ann", meta.kind)
-								f.dropPeer(peer)
-							} else if delivery.metas[i].size != meta.size {
-								log.Warn("Announced transaction size mismatch", "peer", peer, "tx", hash, "size", delivery.metas[i].size, "ann", meta.size)
-								if math.Abs(float64(delivery.metas[i].size)-float64(meta.size)) > 8 {
-									// Normally we should drop a peer considering this is a protocol violation.
-									// However, due to the RLP vs consensus format messyness, allow a few bytes
-									// wiggle-room where we only warn, but don't drop.
-									//
-									// TODO(karalabe): Get rid of this relaxation when clients are proven stable.
-									f.dropPeer(peer)
-								}
-							}
-						}
-						delete(txset, hash)
-						if len(txset) == 0 {
-							delete(f.announces, peer)
-						}
-					}
-					delete(f.announced, hash)
-					delete(f.alternates, hash)
-
-					// If a transaction currently being fetched from a different
-					// origin was delivered (delivery stolen), mark it so the
-					// actual delivery won't double schedule it.
-					if origin, ok := f.fetching[hash]; ok && (origin != delivery.origin || !delivery.direct) {
-						stolen := f.requests[origin].stolen
-						if stolen == nil {
-							f.requests[origin].stolen = make(map[common.Hash]struct{})
-							stolen = f.requests[origin].stolen
-						}
-						stolen[hash] = struct{}{}
-					}
-					delete(f.fetching, hash)
 				}
-			}
+			})
 			// In case of a direct delivery, also reschedule anything missing
 			// from the original query
 			if delivery.direct {
