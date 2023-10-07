@@ -437,6 +437,47 @@ func (f *TxFetcher) processTxDelivery(delivery *txDelivery, callback func(announ
 	}
 }
 
+func (f *TxFetcher) rescheduleMissing(delivery *txDelivery, req *txRequest) {
+	// Anything not delivered should be re-scheduled (with or without
+	// this peer, depending on the response cutoff)
+	delivered := make(map[common.Hash]struct{})
+	for _, hash := range delivery.hashes {
+		delivered[hash] = struct{}{}
+	}
+	cutoff := len(req.hashes) // If nothing is delivered, assume everything is missing, don't retry!!!
+	for i, hash := range req.hashes {
+		if _, ok := delivered[hash]; ok {
+			cutoff = i
+		}
+	}
+	// Reschedule missing hashes from alternates, not-fulfilled from alt+self
+	for i, hash := range req.hashes {
+		// Skip rescheduling hashes already delivered by someone else
+		if req.stolen != nil {
+			if _, ok := req.stolen[hash]; ok {
+				continue
+			}
+		}
+		if _, ok := delivered[hash]; !ok {
+			if i < cutoff {
+				delete(f.alternates[hash], delivery.origin)
+				delete(f.announces[delivery.origin], hash)
+				if len(f.announces[delivery.origin]) == 0 {
+					delete(f.announces, delivery.origin)
+				}
+			}
+			if len(f.alternates[hash]) > 0 {
+				if _, ok := f.announced[hash]; ok {
+					panic(fmt.Sprintf("announced tracker already contains alternate item: %v", f.announced[hash]))
+				}
+				f.announced[hash] = f.alternates[hash]
+			}
+		}
+		delete(f.alternates, hash)
+		delete(f.fetching, hash)
+	}
+}
+
 func (f *TxFetcher) loop() {
 	var (
 		waitTimer    = new(mclock.Timer)
@@ -654,45 +695,7 @@ func (f *TxFetcher) loop() {
 					break
 				}
 				delete(f.requests, delivery.origin)
-
-				// Anything not delivered should be re-scheduled (with or without
-				// this peer, depending on the response cutoff)
-				delivered := make(map[common.Hash]struct{})
-				for _, hash := range delivery.hashes {
-					delivered[hash] = struct{}{}
-				}
-				cutoff := len(req.hashes) // If nothing is delivered, assume everything is missing, don't retry!!!
-				for i, hash := range req.hashes {
-					if _, ok := delivered[hash]; ok {
-						cutoff = i
-					}
-				}
-				// Reschedule missing hashes from alternates, not-fulfilled from alt+self
-				for i, hash := range req.hashes {
-					// Skip rescheduling hashes already delivered by someone else
-					if req.stolen != nil {
-						if _, ok := req.stolen[hash]; ok {
-							continue
-						}
-					}
-					if _, ok := delivered[hash]; !ok {
-						if i < cutoff {
-							delete(f.alternates[hash], delivery.origin)
-							delete(f.announces[delivery.origin], hash)
-							if len(f.announces[delivery.origin]) == 0 {
-								delete(f.announces, delivery.origin)
-							}
-						}
-						if len(f.alternates[hash]) > 0 {
-							if _, ok := f.announced[hash]; ok {
-								panic(fmt.Sprintf("announced tracker already contains alternate item: %v", f.announced[hash]))
-							}
-							f.announced[hash] = f.alternates[hash]
-						}
-					}
-					delete(f.alternates, hash)
-					delete(f.fetching, hash)
-				}
+				f.rescheduleMissing(delivery, req)
 				// Something was delivered, try to reschedule requests
 				f.scheduleFetches(timeoutTimer, timeoutTrigger, nil) // Partial delivery may enable others to deliver too
 			}
