@@ -17,111 +17,149 @@
 package vm
 
 import (
-	"sync"
-
 	"github.com/holiman/uint256"
 )
 
-var stackPool = sync.Pool{
-	New: func() interface{} {
-		return &Stack{data: make([]uint256.Int, 0, 16)}
-	},
+// stackArena is an arena which actual evm stacks use for data storage
+type stackArena struct {
+	data []uint256.Int
+	top  int // first free slot
+}
+
+func (sa *stackArena) push(value *uint256.Int) {
+	// TODO check length of bs.data and possibly grow() it as needed
+	sa.data[sa.top] = *value
+	sa.top++
+}
+
+func (sa *stackArena) pop() {
+	sa.top--
+}
+
+func newArena() *stackArena {
+	return &stackArena{
+		data: make([]uint256.Int, 256),
+	}
+}
+
+// stack returns an instance of a stack which uses the underlying arena. The instance
+// must be released by invoking the (*Stack).release() method
+func (sa *stackArena) stack() *Stack {
+	return &Stack{
+		bottom: sa.top,
+		size:   0,
+		inner:  sa,
+	}
+}
+
+// release un-claims the area of the arena which was claimed by the stack.
+func (s *Stack) release() {
+	// When the stack is returned, need to notify the arena that the new 'top' is
+	// the returned stack's bottom.
+	s.inner.top = s.bottom
+}
+
+// newStackForTesting is meant to be used solely for testing. It creates a stack
+// backed by a newly allocated arena.
+func newStackForTesting() *Stack {
+	arena := &stackArena{
+		data: make([]uint256.Int, 256),
+	}
+	return arena.stack()
 }
 
 // Stack is an object for basic stack operations. Items popped to the stack are
 // expected to be changed and modified. stack does not take care of adding newly
 // initialized objects.
 type Stack struct {
-	data []uint256.Int
-}
-
-func newstack() *Stack {
-	return stackPool.Get().(*Stack)
-}
-
-func returnStack(s *Stack) {
-	s.data = s.data[:0]
-	stackPool.Put(s)
+	bottom int // bottom is the index of the first element of this stack
+	size   int // size is the number of elements in this stack
+	inner  *stackArena
 }
 
 // Data returns the underlying uint256.Int array.
 func (st *Stack) Data() []uint256.Int {
-	return st.data
+	return st.inner.data[st.bottom : st.bottom+st.size]
 }
 
 func (st *Stack) push(d *uint256.Int) {
 	// NOTE push limit (1024) is checked in baseCheck
-	st.data = append(st.data, *d)
+	st.inner.push(d)
+	st.size++
 }
 
-func (st *Stack) pop() (ret uint256.Int) {
-	ret = st.data[len(st.data)-1]
-	st.data = st.data[:len(st.data)-1]
-	return
+func (st *Stack) pop() uint256.Int {
+	ret := st.inner.data[st.bottom+st.size-1]
+	st.inner.pop()
+	st.size--
+	return ret
 }
 
 func (st *Stack) len() int {
-	return len(st.data)
+	return st.size
 }
 
 func (st *Stack) swap1() {
-	st.data[st.len()-2], st.data[st.len()-1] = st.data[st.len()-1], st.data[st.len()-2]
+	st.inner.data[st.bottom+st.size-2], st.inner.data[st.bottom+st.size-1] = st.inner.data[st.bottom+st.size-1], st.inner.data[st.bottom+st.size-2]
 }
 func (st *Stack) swap2() {
-	st.data[st.len()-3], st.data[st.len()-1] = st.data[st.len()-1], st.data[st.len()-3]
+	st.inner.data[st.bottom+st.size-3], st.inner.data[st.bottom+st.size-1] = st.inner.data[st.bottom+st.size-1], st.inner.data[st.bottom+st.size-3]
 }
 func (st *Stack) swap3() {
-	st.data[st.len()-4], st.data[st.len()-1] = st.data[st.len()-1], st.data[st.len()-4]
+	st.inner.data[st.bottom+st.size-4], st.inner.data[st.bottom+st.size-1] = st.inner.data[st.bottom+st.size-1], st.inner.data[st.bottom+st.size-4]
 }
 func (st *Stack) swap4() {
-	st.data[st.len()-5], st.data[st.len()-1] = st.data[st.len()-1], st.data[st.len()-5]
+	st.inner.data[st.bottom+st.size-5], st.inner.data[st.bottom+st.size-1] = st.inner.data[st.bottom+st.size-1], st.inner.data[st.bottom+st.size-5]
 }
 func (st *Stack) swap5() {
-	st.data[st.len()-6], st.data[st.len()-1] = st.data[st.len()-1], st.data[st.len()-6]
+	st.inner.data[st.bottom+st.size-6], st.inner.data[st.bottom+st.size-1] = st.inner.data[st.bottom+st.size-1], st.inner.data[st.bottom+st.size-6]
 }
 func (st *Stack) swap6() {
-	st.data[st.len()-7], st.data[st.len()-1] = st.data[st.len()-1], st.data[st.len()-7]
+	st.inner.data[st.bottom+st.size-7], st.inner.data[st.bottom+st.size-1] = st.inner.data[st.bottom+st.size-1], st.inner.data[st.bottom+st.size-7]
 }
 func (st *Stack) swap7() {
-	st.data[st.len()-8], st.data[st.len()-1] = st.data[st.len()-1], st.data[st.len()-8]
+	st.inner.data[st.bottom+st.size-8], st.inner.data[st.bottom+st.size-1] = st.inner.data[st.bottom+st.size-1], st.inner.data[st.bottom+st.size-8]
 }
 func (st *Stack) swap8() {
-	st.data[st.len()-9], st.data[st.len()-1] = st.data[st.len()-1], st.data[st.len()-9]
+	st.inner.data[st.bottom+st.size-9], st.inner.data[st.bottom+st.size-1] = st.inner.data[st.bottom+st.size-1], st.inner.data[st.bottom+st.size-9]
 }
 func (st *Stack) swap9() {
-	st.data[st.len()-10], st.data[st.len()-1] = st.data[st.len()-1], st.data[st.len()-10]
+	st.inner.data[st.bottom+st.size-10], st.inner.data[st.bottom+st.size-1] = st.inner.data[st.bottom+st.size-1], st.inner.data[st.bottom+st.size-10]
 }
 func (st *Stack) swap10() {
-	st.data[st.len()-11], st.data[st.len()-1] = st.data[st.len()-1], st.data[st.len()-11]
+	st.inner.data[st.bottom+st.size-11], st.inner.data[st.bottom+st.size-1] = st.inner.data[st.bottom+st.size-1], st.inner.data[st.bottom+st.size-11]
 }
 func (st *Stack) swap11() {
-	st.data[st.len()-12], st.data[st.len()-1] = st.data[st.len()-1], st.data[st.len()-12]
+	st.inner.data[st.bottom+st.size-12], st.inner.data[st.bottom+st.size-1] = st.inner.data[st.bottom+st.size-1], st.inner.data[st.bottom+st.size-12]
 }
 func (st *Stack) swap12() {
-	st.data[st.len()-13], st.data[st.len()-1] = st.data[st.len()-1], st.data[st.len()-13]
+	st.inner.data[st.bottom+st.size-13], st.inner.data[st.bottom+st.size-1] = st.inner.data[st.bottom+st.size-1], st.inner.data[st.bottom+st.size-13]
 }
 func (st *Stack) swap13() {
-	st.data[st.len()-14], st.data[st.len()-1] = st.data[st.len()-1], st.data[st.len()-14]
+	st.inner.data[st.bottom+st.size-14], st.inner.data[st.bottom+st.size-1] = st.inner.data[st.bottom+st.size-1], st.inner.data[st.bottom+st.size-14]
 }
 func (st *Stack) swap14() {
-	st.data[st.len()-15], st.data[st.len()-1] = st.data[st.len()-1], st.data[st.len()-15]
+	st.inner.data[st.bottom+st.size-15], st.inner.data[st.bottom+st.size-1] = st.inner.data[st.bottom+st.size-1], st.inner.data[st.bottom+st.size-15]
 }
 func (st *Stack) swap15() {
-	st.data[st.len()-16], st.data[st.len()-1] = st.data[st.len()-1], st.data[st.len()-16]
+	st.inner.data[st.bottom+st.size-16], st.inner.data[st.bottom+st.size-1] = st.inner.data[st.bottom+st.size-1], st.inner.data[st.bottom+st.size-16]
 }
 func (st *Stack) swap16() {
-	st.data[st.len()-17], st.data[st.len()-1] = st.data[st.len()-1], st.data[st.len()-17]
+	st.inner.data[st.bottom+st.size-17], st.inner.data[st.bottom+st.size-1] = st.inner.data[st.bottom+st.size-1], st.inner.data[st.bottom+st.size-17]
 }
 
 func (st *Stack) dup(n int) {
-	st.push(&st.data[st.len()-n])
+	// TODO: check size of inner
+	st.inner.data[st.bottom+st.size] = st.inner.data[st.bottom+st.size-n]
+	st.size++
+	st.inner.top++
 }
 
 func (st *Stack) peek() *uint256.Int {
-	return &st.data[st.len()-1]
+	return &st.inner.data[st.bottom+st.size-1]
 }
 
 // Back returns the n'th item in stack
 func (st *Stack) Back(n int) *uint256.Int {
-	return &st.data[st.len()-n-1]
+	return &st.inner.data[st.bottom+st.size-n-1]
 }
