@@ -17,6 +17,8 @@
 package vm
 
 import (
+	"slices"
+
 	"github.com/holiman/uint256"
 )
 
@@ -27,7 +29,11 @@ type stackArena struct {
 }
 
 func (sa *stackArena) push(value *uint256.Int) {
-	// TODO check length of bs.data and possibly grow() it as needed
+	if len(sa.data) <= sa.top {
+		// we need to grow the arena
+		sa.data = slices.Grow(sa.data, 512)
+		sa.data = sa.data[:cap(sa.data)]
+	}
 	sa.data[sa.top] = *value
 	sa.top++
 }
@@ -38,7 +44,7 @@ func (sa *stackArena) pop() {
 
 func newArena() *stackArena {
 	return &stackArena{
-		data: make([]uint256.Int, 256),
+		data: make([]uint256.Int, 1024),
 	}
 }
 
