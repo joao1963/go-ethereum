@@ -82,8 +82,8 @@ func validateCode(code []byte, section int, container *Container, jt *JumpTable,
 		count                = 0
 		op                   OpCode
 		analysis             bitvec
-		visitedCode          = make(map[int]struct{})
-		visitedSubcontainers = make(map[int]int)
+		visitedCode          map[int]struct{}
+		visitedSubcontainers map[int]int
 		hasReturnContract    bool
 		hasStop              bool
 	)
@@ -129,6 +129,9 @@ func validateCode(code []byte, section int, container *Container, jt *JumpTable,
 			if container.types[arg].outputs == 0x80 {
 				return nil, fmt.Errorf("%w: section %v", ErrInvalidCallArgument, arg)
 			}
+			if visitedCode == nil {
+				visitedCode = make(map[int]struct{})
+			}
 			visitedCode[arg] = struct{}{}
 		case JUMPF:
 			arg, _ := parseUint16(code[i+1:])
@@ -137,6 +140,9 @@ func validateCode(code []byte, section int, container *Container, jt *JumpTable,
 			}
 			if container.types[arg].outputs != 0x80 && container.types[arg].outputs > container.types[section].outputs {
 				return nil, fmt.Errorf("%w: arg %d, last %d, pos %d", ErrInvalidOutputs, arg, len(container.types), i)
+			}
+			if visitedCode == nil {
+				visitedCode = make(map[int]struct{})
 			}
 			visitedCode[arg] = struct{}{}
 		case DATALOADN:
@@ -150,8 +156,11 @@ func validateCode(code []byte, section int, container *Container, jt *JumpTable,
 				return nil, ErrIncompatibleContainerKind
 			}
 			arg := int(code[i+1])
-			if arg >= len(container.sections) {
-				return nil, fmt.Errorf("%w: arg %d, last %d, pos %d", ErrUnreachableCode, arg, len(container.sections), i)
+			if arg >= len(container.subContainers) {
+				return nil, fmt.Errorf("%w: arg %d, last %d, pos %d", ErrUnreachableCode, arg, len(container.subContainers), i)
+			}
+			if visitedSubcontainers == nil {
+				visitedSubcontainers = make(map[int]int)
 			}
 			// We need to store per subcontainer how it was referenced
 			if v, ok := visitedSubcontainers[arg]; ok && v != refByReturnContract {
@@ -164,11 +173,14 @@ func validateCode(code []byte, section int, container *Container, jt *JumpTable,
 			visitedSubcontainers[arg] = refByReturnContract
 		case EOFCREATE:
 			arg := int(code[i+1])
-			if arg >= len(container.sections) {
-				return nil, fmt.Errorf("%w: arg %d, last %d, pos %d", ErrUnreachableCode, arg, len(container.sections), i)
+			if arg >= len(container.subContainers) {
+				return nil, fmt.Errorf("%w: arg %d, last %d, pos %d", ErrUnreachableCode, arg, len(container.subContainers), i)
 			}
-			if ct := container.sections[arg]; len(ct.data) != ct.dataSize {
+			if ct := container.subContainers[arg]; len(ct.data) != ct.dataSize {
 				return nil, fmt.Errorf("%w: container %d, have %d, claimed %d, pos %d", ErrEOFCreateWithTruncatedSection, arg, len(ct.data), ct.dataSize, i)
+			}
+			if visitedSubcontainers == nil {
+				visitedSubcontainers = make(map[int]int)
 			}
 			if _, ok := visitedSubcontainers[arg]; ok {
 				return nil, fmt.Errorf("section already referenced, arg :%d", arg)
