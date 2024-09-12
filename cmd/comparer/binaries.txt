@@ -1,0 +1,2 @@
+/home/user/go/src/github.com/ethereum/go-ethereum/cmd/eofdump/eofdump eof
+/home/user/go/src/github.com/ethereum/go-ethereum/cmd/eofdump/eofdump eof
