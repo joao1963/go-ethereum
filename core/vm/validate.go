@@ -18,6 +18,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 )
 
 // Below are all possible errors that can occur during validation of
@@ -237,4 +238,22 @@ func checkDest(code []byte, analysis *bitvec, imm, from, length int) error {
 		return fmt.Errorf("%w: offset into immediate: offset %d, dest %d, pos %d", ErrInvalidJumpDest, offset, dest, imm)
 	}
 	return nil
+}
+
+// disasm is a helper utility to show a sequence of comma-separated operations,
+// with immediates shown inline,
+// e.g: PUSH1(0x00),EOFCREATE(0x00),
+func disasm(code []byte) string {
+	var ops []string
+	for i := 0; i < len(code); i++ {
+		var op string
+		if args := immediates[code[i]]; args > 0 {
+			op = fmt.Sprintf("%v(%#x)", OpCode(code[i]).String(), code[i+1:i+1+int(args)])
+			i += int(args)
+		} else {
+			op = OpCode(code[i]).String()
+		}
+		ops = append(ops, op)
+	}
+	return strings.Join(ops, ",")
 }
