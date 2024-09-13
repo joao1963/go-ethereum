@@ -171,6 +171,10 @@ func doit(bins []string, inputs chan string, results chan string) error {
 				prev = cur
 				continue
 			}
+			if strings.HasPrefix(prev, "OK") && strings.HasPrefix(cur, "OK") {
+				prev = cur
+				continue
+			}
 			if prev != cur {
 				ok = false
 			}

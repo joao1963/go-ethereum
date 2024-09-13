@@ -45,7 +45,7 @@ func FuzzFoo(f *testing.F) {
 	f.Log("Seeding corpus")
 	// Seed with corpus
 	for i := 0; ; i++ {
-		fname := fmt.Sprintf("../eofdump/testdata/eof_corpus_%d.txt", i)
+		fname := fmt.Sprintf("eof_corpus_%d.txt", i)
 		corpus, err := os.Open(fname)
 		if err != nil {
 			break
