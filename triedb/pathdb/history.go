@@ -21,6 +21,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"time"
 
@@ -29,7 +30,6 @@ import (
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/trie/triestate"
-	"golang.org/x/exp/maps"
 )
 
 // State history records the state changes involved in executing a block. The
@@ -245,13 +245,13 @@ type history struct {
 // newHistory constructs the state history object with provided state change set.
 func newHistory(root common.Hash, parent common.Hash, block uint64, states *triestate.Set) *history {
 	var (
-		accountList = maps.Keys(states.Accounts)
+		accountList = slices.Collect(maps.Keys(states.Accounts))
 		storageList = make(map[common.Address][]common.Hash)
 	)
 	slices.SortFunc(accountList, common.Address.Cmp)
 
 	for addr, slots := range states.Storages {
-		slist := maps.Keys(slots)
+		slist := slices.Collect(maps.Keys(slots))
 		slices.SortFunc(slist, common.Hash.Cmp)
 		storageList[addr] = slist
 	}
