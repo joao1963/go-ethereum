@@ -245,15 +245,12 @@ type history struct {
 // newHistory constructs the state history object with provided state change set.
 func newHistory(root common.Hash, parent common.Hash, block uint64, states *triestate.Set) *history {
 	var (
-		accountList = slices.Collect(maps.Keys(states.Accounts))
+		accountList = slices.SortedFunc(maps.Keys(states.Accounts), common.Address.Cmp)
 		storageList = make(map[common.Address][]common.Hash)
 	)
-	slices.SortFunc(accountList, common.Address.Cmp)
 
 	for addr, slots := range states.Storages {
-		slist := slices.Collect(maps.Keys(slots))
-		slices.SortFunc(slist, common.Hash.Cmp)
-		storageList[addr] = slist
+		storageList[addr] = slices.SortedFunc(maps.Keys(slots), common.Hash.Cmp)
 	}
 	return &history{
 		meta: &meta{
