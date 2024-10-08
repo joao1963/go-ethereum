@@ -1070,7 +1070,7 @@ func (pool *LegacyPool) scheduleReorgLoop() {
 		launchNextRun bool
 		reset         *txpoolResetRequest
 		dirtyAccounts *accountSet
-		queuedEvents  = make(map[common.Address]*sortedMap)
+		queuedEvents  = make(map[common.Address]*SortedMap)
 	)
 	for {
 		// Launch next background reorg if needed
@@ -1083,7 +1083,7 @@ func (pool *LegacyPool) scheduleReorgLoop() {
 			launchNextRun = false
 
 			reset, dirtyAccounts = nil, nil
-			queuedEvents = make(map[common.Address]*sortedMap)
+			queuedEvents = make(map[common.Address]*SortedMap)
 		}
 
 		select {
@@ -1112,7 +1112,7 @@ func (pool *LegacyPool) scheduleReorgLoop() {
 			// request one later if they want the events sent.
 			addr, _ := types.Sender(pool.signer, tx)
 			if _, ok := queuedEvents[addr]; !ok {
-				queuedEvents[addr] = newSortedMap()
+				queuedEvents[addr] = NewSortedMap()
 			}
 			queuedEvents[addr].Put(tx)
 
@@ -1131,7 +1131,7 @@ func (pool *LegacyPool) scheduleReorgLoop() {
 }
 
 // runReorg runs reset and promoteExecutables on behalf of scheduleReorgLoop.
-func (pool *LegacyPool) runReorg(done chan struct{}, reset *txpoolResetRequest, dirtyAccounts *accountSet, events map[common.Address]*sortedMap) {
+func (pool *LegacyPool) runReorg(done chan struct{}, reset *txpoolResetRequest, dirtyAccounts *accountSet, events map[common.Address]*SortedMap) {
 	defer func(t0 time.Time) {
 		reorgDurationTimer.Update(time.Since(t0))
 	}(time.Now())
@@ -1198,7 +1198,7 @@ func (pool *LegacyPool) runReorg(done chan struct{}, reset *txpoolResetRequest, 
 	for _, tx := range promoted {
 		addr, _ := types.Sender(pool.signer, tx)
 		if _, ok := events[addr]; !ok {
-			events[addr] = newSortedMap()
+			events[addr] = NewSortedMap()
 		}
 		events[addr].Put(tx)
 	}
