@@ -37,6 +37,8 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/eth/catalyst"
 	"github.com/ethereum/go-ethereum/eth/ethconfig"
+	"github.com/ethereum/go-ethereum/eth/filters"
+	"github.com/ethereum/go-ethereum/graphql"
 	"github.com/ethereum/go-ethereum/internal/flags"
 	"github.com/ethereum/go-ethereum/internal/version"
 	"github.com/ethereum/go-ethereum/log"
@@ -209,11 +211,19 @@ func makeFullNode(ctx *cli.Context) *node.Node {
 	}
 
 	// Configure log filter RPC API.
-	filterSystem := utils.RegisterFilterAPI(stack, backend, &cfg.Eth)
+	var filterSystem = filters.NewFilterSystem(backend, filters.Config{
+		LogCacheSize: cfg.Eth.FilterLogCacheSize,
+	})
+	stack.RegisterAPIs([]rpc.API{{Namespace: "eth",
+		Service: filters.NewFilterAPI(filterSystem),
+	}})
 
 	// Configure GraphQL if requested.
 	if ctx.IsSet(utils.GraphQLEnabledFlag.Name) {
-		utils.RegisterGraphQLService(stack, backend, filterSystem, &cfg.Node)
+		err := graphql.New(stack, backend, filterSystem, cfg.Node.GraphQLCors, cfg.Node.GraphQLVirtualHosts)
+		if err != nil {
+			utils.Fatalf("Failed to register the GraphQL service: %v", err)
+		}
 	}
 	// Add the Ethereum Stats daemon if requested.
 	if cfg.Ethstats.URL != "" {
