@@ -21,13 +21,14 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum/cmd/utils"
+	flags2 "github.com/ethereum/go-ethereum/cmd/utils/flags"
 	"github.com/ethereum/go-ethereum/console"
 	"github.com/ethereum/go-ethereum/internal/flags"
 	"github.com/urfave/cli/v2"
 )
 
 var (
-	consoleFlags = []cli.Flag{utils.JSpathFlag, utils.ExecFlag, utils.PreloadJSFlag}
+	consoleFlags = []cli.Flag{flags2.JSpathFlag, flags2.ExecFlag, flags2.PreloadJSFlag}
 
 	consoleCommand = &cli.Command{
 		Action: localConsole,
@@ -45,7 +46,7 @@ See https://geth.ethereum.org/docs/interacting-with-geth/javascript-console.`,
 		Name:      "attach",
 		Usage:     "Start an interactive JavaScript environment (connect to node)",
 		ArgsUsage: "[endpoint]",
-		Flags:     flags.Merge([]cli.Flag{utils.DataDirFlag, utils.HttpHeaderFlag}, consoleFlags),
+		Flags:     flags.Merge([]cli.Flag{flags2.DataDirFlag, flags2.HttpHeaderFlag}, consoleFlags),
 		Description: `
 The Geth console is an interactive shell for the JavaScript runtime environment
 which exposes a node admin interface as well as the Ðapp JavaScript API.
@@ -78,7 +79,7 @@ func localConsole(ctx *cli.Context) error {
 	client := stack.Attach()
 	config := console.Config{
 		DataDir: utils.MakeDataDir(ctx),
-		DocRoot: ctx.String(utils.JSpathFlag.Name),
+		DocRoot: ctx.String(flags2.JSpathFlag.Name),
 		Client:  client,
 		Preload: utils.MakeConsolePreloads(ctx),
 	}
@@ -89,7 +90,7 @@ func localConsole(ctx *cli.Context) error {
 	defer console.Stop(false)
 
 	// If only a short execution was requested, evaluate and return.
-	if script := ctx.String(utils.ExecFlag.Name); script != "" {
+	if script := ctx.String(flags2.ExecFlag.Name); script != "" {
 		console.Evaluate(script)
 		return nil
 	}
@@ -119,13 +120,13 @@ func remoteConsole(ctx *cli.Context) error {
 		utils.SetDataDir(ctx, &cfg)
 		endpoint = cfg.IPCEndpoint()
 	}
-	client, err := utils.DialRPCWithHeaders(endpoint, ctx.StringSlice(utils.HttpHeaderFlag.Name))
+	client, err := utils.DialRPCWithHeaders(endpoint, ctx.StringSlice(flags2.HttpHeaderFlag.Name))
 	if err != nil {
 		utils.Fatalf("Unable to attach to remote geth: %v", err)
 	}
 	config := console.Config{
 		DataDir: utils.MakeDataDir(ctx),
-		DocRoot: ctx.String(utils.JSpathFlag.Name),
+		DocRoot: ctx.String(flags2.JSpathFlag.Name),
 		Client:  client,
 		Preload: utils.MakeConsolePreloads(ctx),
 	}
@@ -135,7 +136,7 @@ func remoteConsole(ctx *cli.Context) error {
 	}
 	defer console.Stop(false)
 
-	if script := ctx.String(utils.ExecFlag.Name); script != "" {
+	if script := ctx.String(flags2.ExecFlag.Name); script != "" {
 		console.Evaluate(script)
 		return nil
 	}

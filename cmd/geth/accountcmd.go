@@ -23,6 +23,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/cmd/utils"
+	"github.com/ethereum/go-ethereum/cmd/utils/flags"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/urfave/cli/v2"
@@ -47,10 +48,10 @@ passwordfile as argument containing the wallet password in plaintext.`,
 				ArgsUsage: "<keyFile>",
 				Action:    importWallet,
 				Flags: []cli.Flag{
-					utils.DataDirFlag,
-					utils.KeyStoreDirFlag,
-					utils.PasswordFileFlag,
-					utils.LightKDFFlag,
+					flags.DataDirFlag,
+					flags.KeyStoreDirFlag,
+					flags.PasswordFileFlag,
+					flags.LightKDFFlag,
 				},
 				Description: `
 	geth wallet [options] /path/to/my/presale.wallet
@@ -91,8 +92,8 @@ Make sure you backup your keys regularly.`,
 				Usage:  "Print summary of existing accounts",
 				Action: accountList,
 				Flags: []cli.Flag{
-					utils.DataDirFlag,
-					utils.KeyStoreDirFlag,
+					flags.DataDirFlag,
+					flags.KeyStoreDirFlag,
 				},
 				Description: `
 Print a short summary of all accounts`,
@@ -102,10 +103,10 @@ Print a short summary of all accounts`,
 				Usage:  "Create a new account",
 				Action: accountCreate,
 				Flags: []cli.Flag{
-					utils.DataDirFlag,
-					utils.KeyStoreDirFlag,
-					utils.PasswordFileFlag,
-					utils.LightKDFFlag,
+					flags.DataDirFlag,
+					flags.KeyStoreDirFlag,
+					flags.PasswordFileFlag,
+					flags.LightKDFFlag,
 				},
 				Description: `
     geth account new
@@ -128,9 +129,9 @@ password to file or expose in any other way.
 				Action:    accountUpdate,
 				ArgsUsage: "<address>",
 				Flags: []cli.Flag{
-					utils.DataDirFlag,
-					utils.KeyStoreDirFlag,
-					utils.LightKDFFlag,
+					flags.DataDirFlag,
+					flags.KeyStoreDirFlag,
+					flags.LightKDFFlag,
 				},
 				Description: `
     geth account update <address>
@@ -156,10 +157,10 @@ changing your password is only possible interactively.
 				Usage:  "Import a private key into a new account",
 				Action: accountImport,
 				Flags: []cli.Flag{
-					utils.DataDirFlag,
-					utils.KeyStoreDirFlag,
-					utils.PasswordFileFlag,
-					utils.LightKDFFlag,
+					flags.DataDirFlag,
+					flags.KeyStoreDirFlag,
+					flags.PasswordFileFlag,
+					flags.LightKDFFlag,
 				},
 				ArgsUsage: "<keyFile>",
 				Description: `

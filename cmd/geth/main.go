@@ -44,6 +44,7 @@ import (
 	_ "github.com/ethereum/go-ethereum/eth/tracers/live"
 	_ "github.com/ethereum/go-ethereum/eth/tracers/native"
 
+	flags2 "github.com/ethereum/go-ethereum/cmd/utils/flags"
 	"github.com/urfave/cli/v2"
 )
 
@@ -54,157 +55,157 @@ const (
 var (
 	// flags that configure the node
 	nodeFlags = flags.Merge([]cli.Flag{
-		utils.IdentityFlag,
-		utils.UnlockedAccountFlag,
-		utils.PasswordFileFlag,
-		utils.BootnodesFlag,
-		utils.MinFreeDiskSpaceFlag,
-		utils.KeyStoreDirFlag,
-		utils.ExternalSignerFlag,
+		flags2.IdentityFlag,
+		flags2.UnlockedAccountFlag,
+		flags2.PasswordFileFlag,
+		flags2.BootnodesFlag,
+		flags2.MinFreeDiskSpaceFlag,
+		flags2.KeyStoreDirFlag,
+		flags2.ExternalSignerFlag,
 		utils.NoUSBFlag, // deprecated
-		utils.USBFlag,
-		utils.SmartCardDaemonPathFlag,
-		utils.OverrideCancun,
-		utils.OverrideVerkle,
-		utils.EnablePersonal,
-		utils.TxPoolLocalsFlag,
-		utils.TxPoolNoLocalsFlag,
-		utils.TxPoolJournalFlag,
-		utils.TxPoolRejournalFlag,
-		utils.TxPoolPriceLimitFlag,
-		utils.TxPoolPriceBumpFlag,
-		utils.TxPoolAccountSlotsFlag,
-		utils.TxPoolGlobalSlotsFlag,
-		utils.TxPoolAccountQueueFlag,
-		utils.TxPoolGlobalQueueFlag,
-		utils.TxPoolLifetimeFlag,
-		utils.BlobPoolDataDirFlag,
-		utils.BlobPoolDataCapFlag,
-		utils.BlobPoolPriceBumpFlag,
-		utils.SyncModeFlag,
-		utils.SyncTargetFlag,
-		utils.ExitWhenSyncedFlag,
-		utils.GCModeFlag,
-		utils.SnapshotFlag,
+		flags2.USBFlag,
+		flags2.SmartCardDaemonPathFlag,
+		flags2.OverrideCancun,
+		flags2.OverrideVerkle,
+		flags2.EnablePersonal,
+		flags2.TxPoolLocalsFlag,
+		flags2.TxPoolNoLocalsFlag,
+		flags2.TxPoolJournalFlag,
+		flags2.TxPoolRejournalFlag,
+		flags2.TxPoolPriceLimitFlag,
+		flags2.TxPoolPriceBumpFlag,
+		flags2.TxPoolAccountSlotsFlag,
+		flags2.TxPoolGlobalSlotsFlag,
+		flags2.TxPoolAccountQueueFlag,
+		flags2.TxPoolGlobalQueueFlag,
+		flags2.TxPoolLifetimeFlag,
+		flags2.BlobPoolDataDirFlag,
+		flags2.BlobPoolDataCapFlag,
+		flags2.BlobPoolPriceBumpFlag,
+		flags2.SyncModeFlag,
+		flags2.SyncTargetFlag,
+		flags2.ExitWhenSyncedFlag,
+		flags2.GCModeFlag,
+		flags2.SnapshotFlag,
 		utils.TxLookupLimitFlag, // deprecated
-		utils.TransactionHistoryFlag,
-		utils.StateHistoryFlag,
+		flags2.TransactionHistoryFlag,
+		flags2.StateHistoryFlag,
 		utils.LightServeFlag,    // deprecated
 		utils.LightIngressFlag,  // deprecated
 		utils.LightEgressFlag,   // deprecated
 		utils.LightMaxPeersFlag, // deprecated
 		utils.LightNoPruneFlag,  // deprecated
-		utils.LightKDFFlag,
+		flags2.LightKDFFlag,
 		utils.LightNoSyncServeFlag, // deprecated
-		utils.EthRequiredBlocksFlag,
+		flags2.EthRequiredBlocksFlag,
 		utils.LegacyWhitelistFlag, // deprecated
-		utils.BloomFilterSizeFlag,
-		utils.CacheFlag,
-		utils.CacheDatabaseFlag,
-		utils.CacheTrieFlag,
+		flags2.BloomFilterSizeFlag,
+		flags2.CacheFlag,
+		flags2.CacheDatabaseFlag,
+		flags2.CacheTrieFlag,
 		utils.CacheTrieJournalFlag,   // deprecated
 		utils.CacheTrieRejournalFlag, // deprecated
-		utils.CacheGCFlag,
-		utils.CacheSnapshotFlag,
-		utils.CacheNoPrefetchFlag,
-		utils.CachePreimagesFlag,
-		utils.CacheLogSizeFlag,
-		utils.FDLimitFlag,
-		utils.CryptoKZGFlag,
-		utils.ListenPortFlag,
-		utils.DiscoveryPortFlag,
-		utils.MaxPeersFlag,
-		utils.MaxPendingPeersFlag,
+		flags2.CacheGCFlag,
+		flags2.CacheSnapshotFlag,
+		flags2.CacheNoPrefetchFlag,
+		flags2.CachePreimagesFlag,
+		flags2.CacheLogSizeFlag,
+		flags2.FDLimitFlag,
+		flags2.CryptoKZGFlag,
+		flags2.ListenPortFlag,
+		flags2.DiscoveryPortFlag,
+		flags2.MaxPeersFlag,
+		flags2.MaxPendingPeersFlag,
 		utils.MiningEnabledFlag, // deprecated
-		utils.MinerGasLimitFlag,
-		utils.MinerGasPriceFlag,
+		flags2.MinerGasLimitFlag,
+		flags2.MinerGasPriceFlag,
 		utils.MinerEtherbaseFlag, // deprecated
-		utils.MinerExtraDataFlag,
-		utils.MinerRecommitIntervalFlag,
-		utils.MinerPendingFeeRecipientFlag,
+		flags2.MinerExtraDataFlag,
+		flags2.MinerRecommitIntervalFlag,
+		flags2.MinerPendingFeeRecipientFlag,
 		utils.MinerNewPayloadTimeoutFlag, // deprecated
-		utils.NATFlag,
-		utils.NoDiscoverFlag,
-		utils.DiscoveryV4Flag,
-		utils.DiscoveryV5Flag,
+		flags2.NATFlag,
+		flags2.NoDiscoverFlag,
+		flags2.DiscoveryV4Flag,
+		flags2.DiscoveryV5Flag,
 		utils.LegacyDiscoveryV5Flag, // deprecated
-		utils.NetrestrictFlag,
-		utils.NodeKeyFileFlag,
-		utils.NodeKeyHexFlag,
-		utils.DNSDiscoveryFlag,
-		utils.DeveloperFlag,
-		utils.DeveloperGasLimitFlag,
-		utils.DeveloperPeriodFlag,
-		utils.VMEnableDebugFlag,
-		utils.VMTraceFlag,
-		utils.VMTraceJsonConfigFlag,
-		utils.NetworkIdFlag,
-		utils.EthStatsURLFlag,
-		utils.NoCompactionFlag,
-		utils.GpoBlocksFlag,
-		utils.GpoPercentileFlag,
-		utils.GpoMaxGasPriceFlag,
-		utils.GpoIgnoreGasPriceFlag,
+		flags2.NetrestrictFlag,
+		flags2.NodeKeyFileFlag,
+		flags2.NodeKeyHexFlag,
+		flags2.DNSDiscoveryFlag,
+		flags2.DeveloperFlag,
+		flags2.DeveloperGasLimitFlag,
+		flags2.DeveloperPeriodFlag,
+		flags2.VMEnableDebugFlag,
+		flags2.VMTraceFlag,
+		flags2.VMTraceJsonConfigFlag,
+		flags2.NetworkIdFlag,
+		flags2.EthStatsURLFlag,
+		flags2.NoCompactionFlag,
+		flags2.GpoBlocksFlag,
+		flags2.GpoPercentileFlag,
+		flags2.GpoMaxGasPriceFlag,
+		flags2.GpoIgnoreGasPriceFlag,
 		configFileFlag,
 		utils.LogDebugFlag,
 		utils.LogBacktraceAtFlag,
-		utils.BeaconApiFlag,
-		utils.BeaconApiHeaderFlag,
-		utils.BeaconThresholdFlag,
-		utils.BeaconNoFilterFlag,
-		utils.BeaconConfigFlag,
-		utils.BeaconGenesisRootFlag,
-		utils.BeaconGenesisTimeFlag,
-		utils.BeaconCheckpointFlag,
-	}, utils.NetworkFlags, utils.DatabaseFlags)
+		flags2.BeaconApiFlag,
+		flags2.BeaconApiHeaderFlag,
+		flags2.BeaconThresholdFlag,
+		flags2.BeaconNoFilterFlag,
+		flags2.BeaconConfigFlag,
+		flags2.BeaconGenesisRootFlag,
+		flags2.BeaconGenesisTimeFlag,
+		flags2.BeaconCheckpointFlag,
+	}, flags2.NetworkFlags, flags2.DatabaseFlags)
 
 	rpcFlags = []cli.Flag{
-		utils.HTTPEnabledFlag,
-		utils.HTTPListenAddrFlag,
-		utils.HTTPPortFlag,
-		utils.HTTPCORSDomainFlag,
-		utils.AuthListenFlag,
-		utils.AuthPortFlag,
-		utils.AuthVirtualHostsFlag,
-		utils.JWTSecretFlag,
-		utils.HTTPVirtualHostsFlag,
-		utils.GraphQLEnabledFlag,
-		utils.GraphQLCORSDomainFlag,
-		utils.GraphQLVirtualHostsFlag,
-		utils.HTTPApiFlag,
-		utils.HTTPPathPrefixFlag,
-		utils.WSEnabledFlag,
-		utils.WSListenAddrFlag,
-		utils.WSPortFlag,
-		utils.WSApiFlag,
-		utils.WSAllowedOriginsFlag,
-		utils.WSPathPrefixFlag,
-		utils.IPCDisabledFlag,
-		utils.IPCPathFlag,
-		utils.InsecureUnlockAllowedFlag,
-		utils.RPCGlobalGasCapFlag,
-		utils.RPCGlobalEVMTimeoutFlag,
-		utils.RPCGlobalTxFeeCapFlag,
-		utils.AllowUnprotectedTxs,
-		utils.BatchRequestLimit,
-		utils.BatchResponseMaxSize,
+		flags2.HTTPEnabledFlag,
+		flags2.HTTPListenAddrFlag,
+		flags2.HTTPPortFlag,
+		flags2.HTTPCORSDomainFlag,
+		flags2.AuthListenFlag,
+		flags2.AuthPortFlag,
+		flags2.AuthVirtualHostsFlag,
+		flags2.JWTSecretFlag,
+		flags2.HTTPVirtualHostsFlag,
+		flags2.GraphQLEnabledFlag,
+		flags2.GraphQLCORSDomainFlag,
+		flags2.GraphQLVirtualHostsFlag,
+		flags2.HTTPApiFlag,
+		flags2.HTTPPathPrefixFlag,
+		flags2.WSEnabledFlag,
+		flags2.WSListenAddrFlag,
+		flags2.WSPortFlag,
+		flags2.WSApiFlag,
+		flags2.WSAllowedOriginsFlag,
+		flags2.WSPathPrefixFlag,
+		flags2.IPCDisabledFlag,
+		flags2.IPCPathFlag,
+		flags2.InsecureUnlockAllowedFlag,
+		flags2.RPCGlobalGasCapFlag,
+		flags2.RPCGlobalEVMTimeoutFlag,
+		flags2.RPCGlobalTxFeeCapFlag,
+		flags2.AllowUnprotectedTxs,
+		flags2.BatchRequestLimit,
+		flags2.BatchResponseMaxSize,
 	}
 
 	metricsFlags = []cli.Flag{
-		utils.MetricsEnabledFlag,
+		flags2.MetricsEnabledFlag,
 		utils.MetricsEnabledExpensiveFlag,
-		utils.MetricsHTTPFlag,
-		utils.MetricsPortFlag,
-		utils.MetricsEnableInfluxDBFlag,
-		utils.MetricsInfluxDBEndpointFlag,
-		utils.MetricsInfluxDBDatabaseFlag,
-		utils.MetricsInfluxDBUsernameFlag,
-		utils.MetricsInfluxDBPasswordFlag,
-		utils.MetricsInfluxDBTagsFlag,
-		utils.MetricsEnableInfluxDBV2Flag,
-		utils.MetricsInfluxDBTokenFlag,
-		utils.MetricsInfluxDBBucketFlag,
-		utils.MetricsInfluxDBOrganizationFlag,
+		flags2.MetricsHTTPFlag,
+		flags2.MetricsPortFlag,
+		flags2.MetricsEnableInfluxDBFlag,
+		flags2.MetricsInfluxDBEndpointFlag,
+		flags2.MetricsInfluxDBDatabaseFlag,
+		flags2.MetricsInfluxDBUsernameFlag,
+		flags2.MetricsInfluxDBPasswordFlag,
+		flags2.MetricsInfluxDBTagsFlag,
+		flags2.MetricsEnableInfluxDBV2Flag,
+		flags2.MetricsInfluxDBTokenFlag,
+		flags2.MetricsInfluxDBBucketFlag,
+		flags2.MetricsInfluxDBOrganizationFlag,
 	}
 )
 
@@ -288,13 +289,13 @@ func main() {
 func prepare(ctx *cli.Context) {
 	// If we're running a known preset, log it for convenience.
 	switch {
-	case ctx.IsSet(utils.SepoliaFlag.Name):
+	case ctx.IsSet(flags2.SepoliaFlag.Name):
 		log.Info("Starting Geth on Sepolia testnet...")
 
-	case ctx.IsSet(utils.HoleskyFlag.Name):
+	case ctx.IsSet(flags2.HoleskyFlag.Name):
 		log.Info("Starting Geth on Holesky testnet...")
 
-	case ctx.IsSet(utils.DeveloperFlag.Name):
+	case ctx.IsSet(flags2.DeveloperFlag.Name):
 		log.Info("Starting Geth in ephemeral dev mode...")
 		log.Warn(`You are running Geth in --dev mode. Please note the following:
 
@@ -312,18 +313,18 @@ func prepare(ctx *cli.Context) {
      to 0, and discovery is disabled.
 `)
 
-	case !ctx.IsSet(utils.NetworkIdFlag.Name):
+	case !ctx.IsSet(flags2.NetworkIdFlag.Name):
 		log.Info("Starting Geth on Ethereum mainnet...")
 	}
 	// If we're a full node on mainnet without --cache specified, bump default cache allowance
-	if !ctx.IsSet(utils.CacheFlag.Name) && !ctx.IsSet(utils.NetworkIdFlag.Name) {
+	if !ctx.IsSet(flags2.CacheFlag.Name) && !ctx.IsSet(flags2.NetworkIdFlag.Name) {
 		// Make sure we're not on any supported preconfigured testnet either
-		if !ctx.IsSet(utils.HoleskyFlag.Name) &&
-			!ctx.IsSet(utils.SepoliaFlag.Name) &&
-			!ctx.IsSet(utils.DeveloperFlag.Name) {
+		if !ctx.IsSet(flags2.HoleskyFlag.Name) &&
+			!ctx.IsSet(flags2.SepoliaFlag.Name) &&
+			!ctx.IsSet(flags2.DeveloperFlag.Name) {
 			// Nope, we're really on mainnet. Bump that cache up!
-			log.Info("Bumping default cache on mainnet", "provided", ctx.Int(utils.CacheFlag.Name), "updated", 4096)
-			ctx.Set(utils.CacheFlag.Name, strconv.Itoa(4096))
+			log.Info("Bumping default cache on mainnet", "provided", ctx.Int(flags2.CacheFlag.Name), "updated", 4096)
+			ctx.Set(flags2.CacheFlag.Name, strconv.Itoa(4096))
 		}
 	}
 
@@ -404,7 +405,7 @@ func startNode(ctx *cli.Context, stack *node.Node, isConsole bool) {
 
 	// Spawn a standalone goroutine for status synchronization monitoring,
 	// close the node when synchronization is complete if user required.
-	if ctx.Bool(utils.ExitWhenSyncedFlag.Name) {
+	if ctx.Bool(flags2.ExitWhenSyncedFlag.Name) {
 		go func() {
 			sub := stack.EventMux().Subscribe(downloader.DoneEvent{})
 			defer sub.Unsubscribe()
@@ -430,7 +431,7 @@ func startNode(ctx *cli.Context, stack *node.Node, isConsole bool) {
 // unlockAccounts unlocks any account specifically requested.
 func unlockAccounts(ctx *cli.Context, stack *node.Node) {
 	var unlocks []string
-	inputs := strings.Split(ctx.String(utils.UnlockedAccountFlag.Name), ",")
+	inputs := strings.Split(ctx.String(flags2.UnlockedAccountFlag.Name), ",")
 	for _, input := range inputs {
 		if trimmed := strings.TrimSpace(input); trimmed != "" {
 			unlocks = append(unlocks, trimmed)

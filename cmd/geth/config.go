@@ -33,6 +33,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/usbwallet"
 	"github.com/ethereum/go-ethereum/beacon/blsync"
 	"github.com/ethereum/go-ethereum/cmd/utils"
+	flags2 "github.com/ethereum/go-ethereum/cmd/utils/flags"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/eth/catalyst"
@@ -174,8 +175,8 @@ func makeConfigNode(ctx *cli.Context) (*node.Node, gethConfig) {
 	}
 
 	utils.SetEthConfig(ctx, stack, &cfg.Eth)
-	if ctx.IsSet(utils.EthStatsURLFlag.Name) {
-		cfg.Ethstats.URL = ctx.String(utils.EthStatsURLFlag.Name)
+	if ctx.IsSet(flags2.EthStatsURLFlag.Name) {
+		cfg.Ethstats.URL = ctx.String(flags2.EthStatsURLFlag.Name)
 	}
 	applyMetricConfig(ctx, &cfg)
 
@@ -185,12 +186,12 @@ func makeConfigNode(ctx *cli.Context) (*node.Node, gethConfig) {
 // makeFullNode loads geth configuration and creates the Ethereum backend.
 func makeFullNode(ctx *cli.Context) *node.Node {
 	stack, cfg := makeConfigNode(ctx)
-	if ctx.IsSet(utils.OverrideCancun.Name) {
-		v := ctx.Uint64(utils.OverrideCancun.Name)
+	if ctx.IsSet(flags2.OverrideCancun.Name) {
+		v := ctx.Uint64(flags2.OverrideCancun.Name)
 		cfg.Eth.OverrideCancun = &v
 	}
-	if ctx.IsSet(utils.OverrideVerkle.Name) {
-		v := ctx.Uint64(utils.OverrideVerkle.Name)
+	if ctx.IsSet(flags2.OverrideVerkle.Name) {
+		v := ctx.Uint64(flags2.OverrideVerkle.Name)
 		cfg.Eth.OverrideVerkle = &v
 	}
 
@@ -219,7 +220,7 @@ func makeFullNode(ctx *cli.Context) *node.Node {
 	}})
 
 	// Configure GraphQL if requested.
-	if ctx.IsSet(utils.GraphQLEnabledFlag.Name) {
+	if ctx.IsSet(flags2.GraphQLEnabledFlag.Name) {
 		err := graphql.New(stack, backend, filterSystem, cfg.Node.GraphQLCors, cfg.Node.GraphQLVirtualHosts)
 		if err != nil {
 			utils.Fatalf("Failed to register the GraphQL service: %v", err)
@@ -230,23 +231,23 @@ func makeFullNode(ctx *cli.Context) *node.Node {
 		utils.RegisterEthStatsService(stack, backend, cfg.Ethstats.URL)
 	}
 	// Configure full-sync tester service if requested
-	if ctx.IsSet(utils.SyncTargetFlag.Name) {
-		hex := hexutil.MustDecode(ctx.String(utils.SyncTargetFlag.Name))
+	if ctx.IsSet(flags2.SyncTargetFlag.Name) {
+		hex := hexutil.MustDecode(ctx.String(flags2.SyncTargetFlag.Name))
 		if len(hex) != common.HashLength {
 			utils.Fatalf("invalid sync target length: have %d, want %d", len(hex), common.HashLength)
 		}
 		utils.RegisterFullSyncTester(stack, eth, common.BytesToHash(hex))
 	}
 
-	if ctx.IsSet(utils.DeveloperFlag.Name) {
+	if ctx.IsSet(flags2.DeveloperFlag.Name) {
 		// Start dev mode.
-		simBeacon, err := catalyst.NewSimulatedBeacon(ctx.Uint64(utils.DeveloperPeriodFlag.Name), eth)
+		simBeacon, err := catalyst.NewSimulatedBeacon(ctx.Uint64(flags2.DeveloperPeriodFlag.Name), eth)
 		if err != nil {
 			utils.Fatalf("failed to register dev mode catalyst service: %v", err)
 		}
 		catalyst.RegisterSimulatedBeaconAPIs(stack, simBeacon)
 		stack.RegisterLifecycle(simBeacon)
-	} else if ctx.IsSet(utils.BeaconApiFlag.Name) {
+	} else if ctx.IsSet(flags2.BeaconApiFlag.Name) {
 		// Start blsync mode.
 		srv := rpc.NewServer()
 		srv.RegisterName("engine", catalyst.NewConsensusAPI(eth))
@@ -293,47 +294,47 @@ func dumpConfig(ctx *cli.Context) error {
 }
 
 func applyMetricConfig(ctx *cli.Context, cfg *gethConfig) {
-	if ctx.IsSet(utils.MetricsEnabledFlag.Name) {
-		cfg.Metrics.Enabled = ctx.Bool(utils.MetricsEnabledFlag.Name)
+	if ctx.IsSet(flags2.MetricsEnabledFlag.Name) {
+		cfg.Metrics.Enabled = ctx.Bool(flags2.MetricsEnabledFlag.Name)
 	}
 	if ctx.IsSet(utils.MetricsEnabledExpensiveFlag.Name) {
 		log.Warn("Expensive metrics are collected by default, please remove this flag", "flag", utils.MetricsEnabledExpensiveFlag.Name)
 	}
-	if ctx.IsSet(utils.MetricsHTTPFlag.Name) {
-		cfg.Metrics.HTTP = ctx.String(utils.MetricsHTTPFlag.Name)
+	if ctx.IsSet(flags2.MetricsHTTPFlag.Name) {
+		cfg.Metrics.HTTP = ctx.String(flags2.MetricsHTTPFlag.Name)
 	}
-	if ctx.IsSet(utils.MetricsPortFlag.Name) {
-		cfg.Metrics.Port = ctx.Int(utils.MetricsPortFlag.Name)
+	if ctx.IsSet(flags2.MetricsPortFlag.Name) {
+		cfg.Metrics.Port = ctx.Int(flags2.MetricsPortFlag.Name)
 	}
-	if ctx.IsSet(utils.MetricsEnableInfluxDBFlag.Name) {
-		cfg.Metrics.EnableInfluxDB = ctx.Bool(utils.MetricsEnableInfluxDBFlag.Name)
+	if ctx.IsSet(flags2.MetricsEnableInfluxDBFlag.Name) {
+		cfg.Metrics.EnableInfluxDB = ctx.Bool(flags2.MetricsEnableInfluxDBFlag.Name)
 	}
-	if ctx.IsSet(utils.MetricsInfluxDBEndpointFlag.Name) {
-		cfg.Metrics.InfluxDBEndpoint = ctx.String(utils.MetricsInfluxDBEndpointFlag.Name)
+	if ctx.IsSet(flags2.MetricsInfluxDBEndpointFlag.Name) {
+		cfg.Metrics.InfluxDBEndpoint = ctx.String(flags2.MetricsInfluxDBEndpointFlag.Name)
 	}
-	if ctx.IsSet(utils.MetricsInfluxDBDatabaseFlag.Name) {
-		cfg.Metrics.InfluxDBDatabase = ctx.String(utils.MetricsInfluxDBDatabaseFlag.Name)
+	if ctx.IsSet(flags2.MetricsInfluxDBDatabaseFlag.Name) {
+		cfg.Metrics.InfluxDBDatabase = ctx.String(flags2.MetricsInfluxDBDatabaseFlag.Name)
 	}
-	if ctx.IsSet(utils.MetricsInfluxDBUsernameFlag.Name) {
-		cfg.Metrics.InfluxDBUsername = ctx.String(utils.MetricsInfluxDBUsernameFlag.Name)
+	if ctx.IsSet(flags2.MetricsInfluxDBUsernameFlag.Name) {
+		cfg.Metrics.InfluxDBUsername = ctx.String(flags2.MetricsInfluxDBUsernameFlag.Name)
 	}
-	if ctx.IsSet(utils.MetricsInfluxDBPasswordFlag.Name) {
-		cfg.Metrics.InfluxDBPassword = ctx.String(utils.MetricsInfluxDBPasswordFlag.Name)
+	if ctx.IsSet(flags2.MetricsInfluxDBPasswordFlag.Name) {
+		cfg.Metrics.InfluxDBPassword = ctx.String(flags2.MetricsInfluxDBPasswordFlag.Name)
 	}
-	if ctx.IsSet(utils.MetricsInfluxDBTagsFlag.Name) {
-		cfg.Metrics.InfluxDBTags = ctx.String(utils.MetricsInfluxDBTagsFlag.Name)
+	if ctx.IsSet(flags2.MetricsInfluxDBTagsFlag.Name) {
+		cfg.Metrics.InfluxDBTags = ctx.String(flags2.MetricsInfluxDBTagsFlag.Name)
 	}
-	if ctx.IsSet(utils.MetricsEnableInfluxDBV2Flag.Name) {
-		cfg.Metrics.EnableInfluxDBV2 = ctx.Bool(utils.MetricsEnableInfluxDBV2Flag.Name)
+	if ctx.IsSet(flags2.MetricsEnableInfluxDBV2Flag.Name) {
+		cfg.Metrics.EnableInfluxDBV2 = ctx.Bool(flags2.MetricsEnableInfluxDBV2Flag.Name)
 	}
-	if ctx.IsSet(utils.MetricsInfluxDBTokenFlag.Name) {
-		cfg.Metrics.InfluxDBToken = ctx.String(utils.MetricsInfluxDBTokenFlag.Name)
+	if ctx.IsSet(flags2.MetricsInfluxDBTokenFlag.Name) {
+		cfg.Metrics.InfluxDBToken = ctx.String(flags2.MetricsInfluxDBTokenFlag.Name)
 	}
-	if ctx.IsSet(utils.MetricsInfluxDBBucketFlag.Name) {
-		cfg.Metrics.InfluxDBBucket = ctx.String(utils.MetricsInfluxDBBucketFlag.Name)
+	if ctx.IsSet(flags2.MetricsInfluxDBBucketFlag.Name) {
+		cfg.Metrics.InfluxDBBucket = ctx.String(flags2.MetricsInfluxDBBucketFlag.Name)
 	}
-	if ctx.IsSet(utils.MetricsInfluxDBOrganizationFlag.Name) {
-		cfg.Metrics.InfluxDBOrganization = ctx.String(utils.MetricsInfluxDBOrganizationFlag.Name)
+	if ctx.IsSet(flags2.MetricsInfluxDBOrganizationFlag.Name) {
+		cfg.Metrics.InfluxDBOrganization = ctx.String(flags2.MetricsInfluxDBOrganizationFlag.Name)
 	}
 }
 

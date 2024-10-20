@@ -33,6 +33,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ethereum/go-ethereum/cmd/utils/flags"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/rawdb"
@@ -84,10 +85,10 @@ func StartNode(ctx *cli.Context, stack *node.Node, isConsole bool) {
 		defer signal.Stop(sigc)
 
 		minFreeDiskSpace := 2 * ethconfig.Defaults.TrieDirtyCache // Default 2 * 256Mb
-		if ctx.IsSet(MinFreeDiskSpaceFlag.Name) {
-			minFreeDiskSpace = ctx.Int(MinFreeDiskSpaceFlag.Name)
-		} else if ctx.IsSet(CacheFlag.Name) || ctx.IsSet(CacheGCFlag.Name) {
-			minFreeDiskSpace = 2 * ctx.Int(CacheFlag.Name) * ctx.Int(CacheGCFlag.Name) / 100
+		if ctx.IsSet(flags.MinFreeDiskSpaceFlag.Name) {
+			minFreeDiskSpace = ctx.Int(flags.MinFreeDiskSpaceFlag.Name)
+		} else if ctx.IsSet(flags.CacheFlag.Name) || ctx.IsSet(flags.CacheGCFlag.Name) {
+			minFreeDiskSpace = 2 * ctx.Int(flags.CacheDatabaseFlag.Name) * ctx.Int(flags.CacheGCFlag.Name) / 100
 		}
 		if minFreeDiskSpace > 0 {
 			go monitorFreeDiskSpace(sigc, stack.InstanceDir(), uint64(minFreeDiskSpace)*1024*1024)

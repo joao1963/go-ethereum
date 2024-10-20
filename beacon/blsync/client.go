@@ -25,6 +25,7 @@ import (
 	"github.com/ethereum/go-ethereum/beacon/light/sync"
 	"github.com/ethereum/go-ethereum/beacon/types"
 	"github.com/ethereum/go-ethereum/cmd/utils"
+	"github.com/ethereum/go-ethereum/cmd/utils/flags"
 	"github.com/ethereum/go-ethereum/common/mclock"
 	"github.com/ethereum/go-ethereum/ethdb/memorydb"
 	"github.com/ethereum/go-ethereum/event"
@@ -45,14 +46,14 @@ type Client struct {
 }
 
 func NewClient(ctx *cli.Context) *Client {
-	if !ctx.IsSet(utils.BeaconApiFlag.Name) {
+	if !ctx.IsSet(flags.BeaconApiFlag.Name) {
 		utils.Fatalf("Beacon node light client API URL not specified")
 	}
 	var (
 		chainConfig  = makeChainConfig(ctx)
 		customHeader = make(map[string]string)
 	)
-	for _, s := range ctx.StringSlice(utils.BeaconApiHeaderFlag.Name) {
+	for _, s := range ctx.StringSlice(flags.BeaconApiHeaderFlag.Name) {
 		kv := strings.Split(s, ":")
 		if len(kv) != 2 {
 			utils.Fatalf("Invalid custom API header entry: %s", s)
@@ -63,8 +64,8 @@ func NewClient(ctx *cli.Context) *Client {
 	// create data structures
 	var (
 		db             = memorydb.New()
-		threshold      = ctx.Int(utils.BeaconThresholdFlag.Name)
-		committeeChain = light.NewCommitteeChain(db, chainConfig.ChainConfig, threshold, !ctx.Bool(utils.BeaconNoFilterFlag.Name))
+		threshold      = ctx.Int(flags.BeaconThresholdFlag.Name)
+		committeeChain = light.NewCommitteeChain(db, chainConfig.ChainConfig, threshold, !ctx.Bool(flags.BeaconNoFilterFlag.Name))
 		headTracker    = light.NewHeadTracker(committeeChain, threshold)
 	)
 	headSync := sync.NewHeadSync(headTracker, committeeChain)
@@ -83,7 +84,7 @@ func NewClient(ctx *cli.Context) *Client {
 
 	return &Client{
 		scheduler:    scheduler,
-		urls:         ctx.StringSlice(utils.BeaconApiFlag.Name),
+		urls:         ctx.StringSlice(flags.BeaconApiFlag.Name),
 		customHeader: customHeader,
 		chainConfig:  &chainConfig,
 		blockSync:    beaconBlockSync,

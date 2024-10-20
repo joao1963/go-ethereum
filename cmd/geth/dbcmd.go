@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/cmd/utils"
+	flags2 "github.com/ethereum/go-ethereum/cmd/utils/flags"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/console/prompt"
@@ -60,7 +61,7 @@ var (
 		Name:      "removedb",
 		Usage:     "Remove blockchain and state databases",
 		ArgsUsage: "",
-		Flags: flags.Merge(utils.DatabaseFlags,
+		Flags: flags.Merge(flags2.DatabaseFlags,
 			[]cli.Flag{removeStateDataFlag, removeChainDataFlag}),
 		Description: `
 Remove blockchain and state databases`,
@@ -90,8 +91,8 @@ Remove blockchain and state databases`,
 		Name:      "inspect",
 		ArgsUsage: "<prefix> <start>",
 		Flags: flags.Merge([]cli.Flag{
-			utils.SyncModeFlag,
-		}, utils.NetworkFlags, utils.DatabaseFlags),
+			flags2.SyncModeFlag,
+		}, flags2.NetworkFlags, flags2.DatabaseFlags),
 		Usage:       "Inspect the storage size for each type of data in the database",
 		Description: `This commands iterates the entire database. If the optional 'prefix' and 'start' arguments are provided, then the iteration is limited to the given subset of data.`,
 	}
@@ -99,7 +100,7 @@ Remove blockchain and state databases`,
 		Action:    checkStateContent,
 		Name:      "check-state-content",
 		ArgsUsage: "<start (optional)>",
-		Flags:     flags.Merge(utils.NetworkFlags, utils.DatabaseFlags),
+		Flags:     flags.Merge(flags2.NetworkFlags, flags2.DatabaseFlags),
 		Usage:     "Verify that state data is cryptographically correct",
 		Description: `This command iterates the entire database for 32-byte keys, looking for rlp-encoded trie nodes.
 For each trie node encountered, it checks that the key corresponds to the keccak256(value). If this is not true, this indicates
@@ -110,18 +111,18 @@ a data corruption.`,
 		Name:   "stats",
 		Usage:  "Print leveldb statistics",
 		Flags: flags.Merge([]cli.Flag{
-			utils.SyncModeFlag,
-		}, utils.NetworkFlags, utils.DatabaseFlags),
+			flags2.SyncModeFlag,
+		}, flags2.NetworkFlags, flags2.DatabaseFlags),
 	}
 	dbCompactCmd = &cli.Command{
 		Action: dbCompact,
 		Name:   "compact",
 		Usage:  "Compact leveldb database. WARNING: May take a very long time",
 		Flags: flags.Merge([]cli.Flag{
-			utils.SyncModeFlag,
-			utils.CacheFlag,
-			utils.CacheDatabaseFlag,
-		}, utils.NetworkFlags, utils.DatabaseFlags),
+			flags2.SyncModeFlag,
+			flags2.CacheFlag,
+			flags2.CacheDatabaseFlag,
+		}, flags2.NetworkFlags, flags2.DatabaseFlags),
 		Description: `This command performs a database compaction.
 WARNING: This operation may take a very long time to finish, and may cause database
 corruption if it is aborted during execution'!`,
@@ -132,8 +133,8 @@ corruption if it is aborted during execution'!`,
 		Usage:     "Show the value of a database key",
 		ArgsUsage: "<hex-encoded key>",
 		Flags: flags.Merge([]cli.Flag{
-			utils.SyncModeFlag,
-		}, utils.NetworkFlags, utils.DatabaseFlags),
+			flags2.SyncModeFlag,
+		}, flags2.NetworkFlags, flags2.DatabaseFlags),
 		Description: "This command looks up the specified database key from the database.",
 	}
 	dbDeleteCmd = &cli.Command{
@@ -142,8 +143,8 @@ corruption if it is aborted during execution'!`,
 		Usage:     "Delete a database key (WARNING: may corrupt your database)",
 		ArgsUsage: "<hex-encoded key>",
 		Flags: flags.Merge([]cli.Flag{
-			utils.SyncModeFlag,
-		}, utils.NetworkFlags, utils.DatabaseFlags),
+			flags2.SyncModeFlag,
+		}, flags2.NetworkFlags, flags2.DatabaseFlags),
 		Description: `This command deletes the specified database key from the database.
 WARNING: This is a low-level operation which may cause database corruption!`,
 	}
@@ -153,8 +154,8 @@ WARNING: This is a low-level operation which may cause database corruption!`,
 		Usage:     "Set the value of a database key (WARNING: may corrupt your database)",
 		ArgsUsage: "<hex-encoded key> <hex-encoded value>",
 		Flags: flags.Merge([]cli.Flag{
-			utils.SyncModeFlag,
-		}, utils.NetworkFlags, utils.DatabaseFlags),
+			flags2.SyncModeFlag,
+		}, flags2.NetworkFlags, flags2.DatabaseFlags),
 		Description: `This command sets a given database key to the given value.
 WARNING: This is a low-level operation which may cause database corruption!`,
 	}
@@ -164,8 +165,8 @@ WARNING: This is a low-level operation which may cause database corruption!`,
 		Usage:     "Show the storage key/values of a given storage trie",
 		ArgsUsage: "<hex-encoded state root> <hex-encoded account hash> <hex-encoded storage trie root> <hex-encoded start (optional)> <int max elements (optional)>",
 		Flags: flags.Merge([]cli.Flag{
-			utils.SyncModeFlag,
-		}, utils.NetworkFlags, utils.DatabaseFlags),
+			flags2.SyncModeFlag,
+		}, flags2.NetworkFlags, flags2.DatabaseFlags),
 		Description: "This command looks up the specified database key from the database.",
 	}
 	dbDumpFreezerIndex = &cli.Command{
@@ -174,8 +175,8 @@ WARNING: This is a low-level operation which may cause database corruption!`,
 		Usage:     "Dump out the index of a specific freezer table",
 		ArgsUsage: "<freezer-type> <table-type> <start (int)> <end (int)>",
 		Flags: flags.Merge([]cli.Flag{
-			utils.SyncModeFlag,
-		}, utils.NetworkFlags, utils.DatabaseFlags),
+			flags2.SyncModeFlag,
+		}, flags2.NetworkFlags, flags2.DatabaseFlags),
 		Description: "This command displays information about the freezer index.",
 	}
 	dbImportCmd = &cli.Command{
@@ -184,8 +185,8 @@ WARNING: This is a low-level operation which may cause database corruption!`,
 		Usage:     "Imports leveldb-data from an exported RLP dump.",
 		ArgsUsage: "<dumpfile> <start (optional)",
 		Flags: flags.Merge([]cli.Flag{
-			utils.SyncModeFlag,
-		}, utils.NetworkFlags, utils.DatabaseFlags),
+			flags2.SyncModeFlag,
+		}, flags2.NetworkFlags, flags2.DatabaseFlags),
 		Description: "The import command imports the specific chain data from an RLP encoded stream.",
 	}
 	dbExportCmd = &cli.Command{
@@ -194,8 +195,8 @@ WARNING: This is a low-level operation which may cause database corruption!`,
 		Usage:     "Exports the chain data into an RLP dump. If the <dumpfile> has .gz suffix, gzip compression will be used.",
 		ArgsUsage: "<type> <dumpfile>",
 		Flags: flags.Merge([]cli.Flag{
-			utils.SyncModeFlag,
-		}, utils.NetworkFlags, utils.DatabaseFlags),
+			flags2.SyncModeFlag,
+		}, flags2.NetworkFlags, flags2.DatabaseFlags),
 		Description: "Exports the specified chain data to an RLP encoded stream, optionally gzip-compressed.",
 	}
 	dbMetadataCmd = &cli.Command{
@@ -203,8 +204,8 @@ WARNING: This is a low-level operation which may cause database corruption!`,
 		Name:   "metadata",
 		Usage:  "Shows metadata about the chain status.",
 		Flags: flags.Merge([]cli.Flag{
-			utils.SyncModeFlag,
-		}, utils.NetworkFlags, utils.DatabaseFlags),
+			flags2.SyncModeFlag,
+		}, flags2.NetworkFlags, flags2.DatabaseFlags),
 		Description: "Shows metadata about the chain status.",
 	}
 	dbInspectHistoryCmd = &cli.Command{
@@ -213,7 +214,7 @@ WARNING: This is a low-level operation which may cause database corruption!`,
 		Usage:     "Inspect the state history within block range",
 		ArgsUsage: "<address> [OPTIONAL <storage-slot>]",
 		Flags: flags.Merge([]cli.Flag{
-			utils.SyncModeFlag,
+			flags2.SyncModeFlag,
 			&cli.Uint64Flag{
 				Name:  "start",
 				Usage: "block number of the range start, zero means earliest history",
@@ -226,7 +227,7 @@ WARNING: This is a low-level operation which may cause database corruption!`,
 				Name:  "raw",
 				Usage: "display the decoded raw state value (otherwise shows rlp-encoded value)",
 			},
-		}, utils.NetworkFlags, utils.DatabaseFlags),
+		}, flags2.NetworkFlags, flags2.DatabaseFlags),
 		Description: "This command queries the history of the account or storage slot within the specified block range",
 	}
 )
@@ -622,7 +623,7 @@ func freezerInspect(ctx *cli.Context) error {
 		return err
 	}
 	stack, _ := makeConfigNode(ctx)
-	ancient := stack.ResolveAncient("chaindata", ctx.String(utils.AncientFlag.Name))
+	ancient := stack.ResolveAncient("chaindata", ctx.String(flags2.AncientFlag.Name))
 	stack.Close()
 	return rawdb.InspectFreezerTable(ancient, freezer, table, start, end)
 }

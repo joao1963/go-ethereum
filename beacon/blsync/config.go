@@ -19,6 +19,7 @@ package blsync
 import (
 	"github.com/ethereum/go-ethereum/beacon/types"
 	"github.com/ethereum/go-ethereum/cmd/utils"
+	"github.com/ethereum/go-ethereum/cmd/utils/flags"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/urfave/cli/v2"
@@ -60,12 +61,12 @@ var (
 
 func makeChainConfig(ctx *cli.Context) lightClientConfig {
 	var config lightClientConfig
-	customConfig := ctx.IsSet(utils.BeaconConfigFlag.Name)
-	utils.CheckExclusive(ctx, utils.MainnetFlag, utils.SepoliaFlag, utils.BeaconConfigFlag)
+	customConfig := ctx.IsSet(flags.BeaconConfigFlag.Name)
+	utils.CheckExclusive(ctx, flags.MainnetFlag, flags.SepoliaFlag, flags.BeaconConfigFlag)
 	switch {
-	case ctx.Bool(utils.MainnetFlag.Name):
+	case ctx.Bool(flags.MainnetFlag.Name):
 		config = MainnetConfig
-	case ctx.Bool(utils.SepoliaFlag.Name):
+	case ctx.Bool(flags.SepoliaFlag.Name):
 		config = SepoliaConfig
 	default:
 		if !customConfig {
@@ -74,40 +75,40 @@ func makeChainConfig(ctx *cli.Context) lightClientConfig {
 	}
 	// Genesis root and time should always be specified together with custom chain config
 	if customConfig {
-		if !ctx.IsSet(utils.BeaconGenesisRootFlag.Name) {
+		if !ctx.IsSet(flags.BeaconGenesisRootFlag.Name) {
 			utils.Fatalf("Custom beacon chain config is specified but genesis root is missing")
 		}
-		if !ctx.IsSet(utils.BeaconGenesisTimeFlag.Name) {
+		if !ctx.IsSet(flags.BeaconGenesisTimeFlag.Name) {
 			utils.Fatalf("Custom beacon chain config is specified but genesis time is missing")
 		}
-		if !ctx.IsSet(utils.BeaconCheckpointFlag.Name) {
+		if !ctx.IsSet(flags.BeaconCheckpointFlag.Name) {
 			utils.Fatalf("Custom beacon chain config is specified but checkpoint is missing")
 		}
 		config.ChainConfig = &types.ChainConfig{
-			GenesisTime: ctx.Uint64(utils.BeaconGenesisTimeFlag.Name),
+			GenesisTime: ctx.Uint64(flags.BeaconGenesisTimeFlag.Name),
 		}
-		if c, err := hexutil.Decode(ctx.String(utils.BeaconGenesisRootFlag.Name)); err == nil && len(c) <= 32 {
+		if c, err := hexutil.Decode(ctx.String(flags.BeaconGenesisRootFlag.Name)); err == nil && len(c) <= 32 {
 			copy(config.GenesisValidatorsRoot[:len(c)], c)
 		} else {
-			utils.Fatalf("Invalid hex string", "beacon.genesis.gvroot", ctx.String(utils.BeaconGenesisRootFlag.Name), "error", err)
+			utils.Fatalf("Invalid hex string", "beacon.genesis.gvroot", ctx.String(flags.BeaconGenesisRootFlag.Name), "error", err)
 		}
-		if err := config.ChainConfig.LoadForks(ctx.String(utils.BeaconConfigFlag.Name)); err != nil {
-			utils.Fatalf("Could not load beacon chain config file", "file name", ctx.String(utils.BeaconConfigFlag.Name), "error", err)
+		if err := config.ChainConfig.LoadForks(ctx.String(flags.BeaconConfigFlag.Name)); err != nil {
+			utils.Fatalf("Could not load beacon chain config file", "file name", ctx.String(flags.BeaconConfigFlag.Name), "error", err)
 		}
 	} else {
-		if ctx.IsSet(utils.BeaconGenesisRootFlag.Name) {
+		if ctx.IsSet(flags.BeaconGenesisRootFlag.Name) {
 			utils.Fatalf("Genesis root is specified but custom beacon chain config is missing")
 		}
-		if ctx.IsSet(utils.BeaconGenesisTimeFlag.Name) {
+		if ctx.IsSet(flags.BeaconGenesisTimeFlag.Name) {
 			utils.Fatalf("Genesis time is specified but custom beacon chain config is missing")
 		}
 	}
 	// Checkpoint is required with custom chain config and is optional with pre-defined config
-	if ctx.IsSet(utils.BeaconCheckpointFlag.Name) {
-		if c, err := hexutil.Decode(ctx.String(utils.BeaconCheckpointFlag.Name)); err == nil && len(c) <= 32 {
+	if ctx.IsSet(flags.BeaconCheckpointFlag.Name) {
+		if c, err := hexutil.Decode(ctx.String(flags.BeaconCheckpointFlag.Name)); err == nil && len(c) <= 32 {
 			copy(config.Checkpoint[:len(c)], c)
 		} else {
-			utils.Fatalf("Invalid hex string", "beacon.checkpoint", ctx.String(utils.BeaconCheckpointFlag.Name), "error", err)
+			utils.Fatalf("Invalid hex string", "beacon.checkpoint", ctx.String(flags.BeaconCheckpointFlag.Name), "error", err)
 		}
 	}
 	return config
