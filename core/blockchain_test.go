@@ -4233,8 +4233,12 @@ func TestPragueRequests(t *testing.T) {
 }
 
 func BenchmarkReorg(b *testing.B) {
+	if testing.Short() {
+		// The setup-phase of this test takes ~45s with b.N == 1000
+		b.Skip("skipping in -short mode")
+	}
 	chainLength := b.N
-
+	//t0 := time.Now()
 	dir := b.TempDir()
 	db, err := rawdb.NewPebbleDBDatabase(dir, 128, 128, "", false)
 	if err != nil {
@@ -4249,12 +4253,14 @@ func BenchmarkReorg(b *testing.B) {
 	defer blockchain.Stop()
 
 	// Insert an easy and a difficult chain afterwards
-	easyBlocks, _ := GenerateChain(params.TestChainConfig, blockchain.GetBlockByHash(blockchain.CurrentBlock().Hash()), ethash.NewFaker(), db, chainLength, genValueTx(50000))
-	diffBlocks, _ := GenerateChain(params.TestChainConfig, blockchain.GetBlockByHash(blockchain.CurrentBlock().Hash()), ethash.NewFaker(), db, chainLength, genValueTx(50000))
-
+	txGen := genValueTx(50000)
+	easyBlocks, _ := GenerateChain(params.TestChainConfig, blockchain.GetBlockByHash(blockchain.CurrentBlock().Hash()), ethash.NewFaker(), db, chainLength, txGen)
+	diffBlocks, _ := GenerateChain(params.TestChainConfig, blockchain.GetBlockByHash(blockchain.CurrentBlock().Hash()), ethash.NewFaker(), db, chainLength, txGen)
+	//b.Log("Setup 1 done", "elapsed", time.Since(t0), "chainLength", chainLength)
 	if _, err := blockchain.InsertChain(easyBlocks); err != nil {
 		b.Fatalf("failed to insert easy chain: %v", err)
 	}
+	//b.Log("Setup 2 done", "elapsed", time.Since(t0), "chainLength", chainLength)
 	b.ResetTimer()
 	if _, err := blockchain.InsertChain(diffBlocks); err != nil {
 		b.Fatalf("failed to insert difficult chain: %v", err)
