@@ -4236,7 +4236,7 @@ func BenchmarkReorg(b *testing.B) {
 	chainLength := b.N
 
 	dir := b.TempDir()
-	db, err := rawdb.NewLevelDBDatabase(dir, 128, 128, "", false)
+	db, err := rawdb.NewPebbleDBDatabase(dir, 128, 128, "", false)
 	if err != nil {
 		b.Fatalf("cannot create temporary database: %v", err)
 	}
